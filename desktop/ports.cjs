@@ -106,7 +106,22 @@ function createPortService({ ipcMain, getPanel, scan = listListeningPorts, openE
   let snapshot = [];
   let opening = false;
   let identities = new Map();
-  const terminator = createTerminator({ scan, inspect, confirm, react, isProtected });
+  let enabled = true;
+  let generation = 0;
+  const makeTerminator = () => createTerminator({ scan, inspect, confirm, react, isProtected });
+  let terminator = makeTerminator();
+  function setEnabled(value) {
+    if (enabled === value) return;
+    enabled = value;
+    generation++;
+    controller?.abort();
+    controller = null;
+    pending = null;
+    snapshot = [];
+    identities = new Map();
+    terminator.dispose();
+    if (enabled) terminator = makeTerminator();
+  }
   function allowed(event) {
     const panel = getPanel();
     return !disposed && panel && !panel.isDestroyed() && !panel.webContents.isDestroyed()
@@ -114,12 +129,17 @@ function createPortService({ ipcMain, getPanel, scan = listListeningPorts, openE
   }
   ipcMain.handle('ports:list', event => {
     if (!allowed(event)) return { ok: false, error: '허용되지 않은 요청이에요.' };
+    if (!enabled) return { ok: false, error: 'M02 개발 포트가 꺼져 있어요.' };
     if (!pending) {
+      const current = generation;
       controller = new AbortController();
       const signal = controller.signal;
-      pending = Promise.resolve().then(() => Promise.allSettled([scan({ signal }), inspect({ signal })]))
+      pending = Promise.resolve().then(() => {
+        if (disposed || current !== generation) throw new PortError('포트 조회가 취소됐어요.');
+        return Promise.allSettled([scan({ signal }), inspect({ signal })]);
+      })
         .then(([scanResult, processResult]) => {
-          if (disposed) throw new PortError('포트 조회가 취소됐어요.');
+          if (disposed || current !== generation) throw new PortError('포트 조회가 취소됐어요.');
           if (scanResult.status === 'rejected') throw scanResult.reason;
           const value = scanResult.value;
           identities = processResult.status === 'fulfilled' ? processResult.value : new Map();
@@ -128,12 +148,13 @@ function createPortService({ ipcMain, getPanel, scan = listListeningPorts, openE
           return { ok: true, value: { ...value, items: snapshot, checkedAt: new Date().toISOString() } };
         })
         .catch(error => ({ ok: false, error: error instanceof PortError ? error.message : '포트를 조회하지 못했어요. 다시 시도해 주세요.' }))
-        .finally(() => { pending = null; controller = null; });
+        .finally(() => { if (current === generation) { pending = null; controller = null; } });
     }
     return pending;
   });
   ipcMain.handle('ports:open', async (event, target) => {
     if (!allowed(event)) return { ok: false, error: '허용되지 않은 요청이에요.' };
+    if (!enabled) return { ok: false, error: 'M02 개발 포트가 꺼져 있어요.' };
     if (!target || !Number.isSafeInteger(target.pid) || target.pid < 1
       || !Number.isInteger(target.port) || target.port < 1 || target.port > 65535) {
       return { ok: false, error: '올바른 포트 항목을 선택해 주세요.' };
@@ -152,11 +173,12 @@ function createPortService({ ipcMain, getPanel, scan = listListeningPorts, openE
   });
   ipcMain.handle('ports:terminate', async (event, target) => {
     if (!allowed(event)) return { ok: false, error: '허용되지 않은 요청이에요.' };
+    if (!enabled) return { ok: false, error: 'M02 개발 포트가 꺼져 있어요.' };
     const item = target && snapshot.find(item => item.pid === target.pid && item.port === target.port);
     if (!item) return { ok: false, error: '목록을 새로고침하고 종료할 포트를 선택해 주세요.' };
-    return terminator.terminate(item, identities.get(item.pid), () => allowed(event));
+    return terminator.terminate(item, identities.get(item.pid), () => enabled && allowed(event));
   });
-  return { dispose() {
+  return { setEnabled, dispose() {
     disposed = true;
     snapshot = [];
     controller?.abort();

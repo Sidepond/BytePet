@@ -4,19 +4,21 @@ const { getPanelBounds } = require('./window.cjs');
 const { createFoodService } = require('./food.cjs');
 const { createResultService } = require('./results.cjs');
 const { createPortService } = require('./ports.cjs');
+const { createModuleService, createModuleStore } = require('./modules.cjs');
 
 function createUtilityPanel(pet) {
   let panel;
   let open = false;
   let ready = false;
+  const modules = createModuleService({ ipcMain, store: createModuleStore(app.getPath('userData')), getPet: () => pet, getPanel: () => panel });
   const food = createFoodService(pet, () => panel);
   const results = createResultService({ ipcMain, clipboard, pet, getPanel: () => panel });
   const ports = createPortService({
     ipcMain, getPanel: () => panel, openExternal: url => shell.openExternal(url),
     isProtected: pid => pid <= 1 || pid === process.pid || app.getAppMetrics().some(info => info.pid === pid),
-    confirm: async item => {
+    confirm: async (item, { signal }) => {
       const result = await dialog.showMessageBox(panel, {
-        type: 'warning', title: '프로세스 종료', message: `${item.name} 프로세스를 종료할까요?`,
+        signal, type: 'warning', title: '프로세스 종료', message: `${item.name} 프로세스를 종료할까요?`,
         detail: `PID ${item.pid}\n실행 파일: ${item.command}\n확인된 포트: ${item.ports.join(', ')}\n\n이 프로세스의 모든 작업과 포트가 함께 종료됩니다. 저장하지 않은 작업은 사라질 수 있어요.`,
         buttons: ['취소', '프로세스 종료'], defaultId: 0, cancelId: 0, noLink: true,
       });
@@ -26,6 +28,14 @@ function createUtilityPanel(pet) {
       if (!pet.isDestroyed() && !pet.webContents.isDestroyed()) pet.webContents.send('ports:reaction', reaction);
     },
   });
+
+  function applyModules({ modules: enabled }) {
+    food.setEnabled(enabled.m01);
+    results.setEnabled(enabled.m01);
+    ports.setEnabled(enabled.m02);
+  }
+  applyModules(modules.state());
+  modules.subscribe(applyModules);
 
   function publish() {
     // The renderer can be destroyed before the native parent window closes.
@@ -86,18 +96,24 @@ function createUtilityPanel(pet) {
   function close(event) {
     if (from(event, panel) || from(event, pet)) hide();
   }
+  function rendererReady(event) {
+    if (from(event, panel)) show();
+  }
   ipcMain.on('pet:panel-toggle', toggle);
   ipcMain.on('panel:close', close);
+  ipcMain.on('panel:ready', rendererReady);
   pet.webContents.on('did-finish-load', publish);
 
   return {
     reposition,
     dispose() {
+      modules.dispose();
       food.dispose();
       results.dispose();
       ports.dispose();
       ipcMain.removeListener('pet:panel-toggle', toggle);
       ipcMain.removeListener('panel:close', close);
+      ipcMain.removeListener('panel:ready', rendererReady);
       if (panel && !panel.isDestroyed()) panel.destroy();
     },
   };

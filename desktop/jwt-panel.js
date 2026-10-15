@@ -10,6 +10,7 @@ export function setupJwtPanel(draft, beforeDecode = () => {}) {
   const signature = document.querySelector('#jwt-signature');
   const expiration = document.querySelector('#jwt-expiration');
   let decoded = null;
+  let timer;
   const setCopyAvailable = setupResultCopy('#jwt-copy-status', [
     ['#copy-jwt-header', () => header.textContent],
     ['#copy-jwt-payload', () => payload.textContent],
@@ -23,6 +24,8 @@ export function setupJwtPanel(draft, beforeDecode = () => {}) {
     expiration.dataset.state = status.state;
   }
   function clear() {
+    clearInterval(timer);
+    timer = null;
     setCopyAvailable(false);
     decoded = null;
     result.hidden = true;
@@ -40,6 +43,7 @@ export function setupJwtPanel(draft, beforeDecode = () => {}) {
         ? '서명 없음 (alg: none) · 토큰의 진위를 확인하지 않았어요.'
         : '서명 미검증 · 토큰의 진위를 확인하지 않았어요.';
       updateExpiration();
+      timer = setInterval(updateExpiration, 1000);
       output.hidden = false;
       error.hidden = true;
       setCopyAvailable(true);
@@ -56,7 +60,6 @@ export function setupJwtPanel(draft, beforeDecode = () => {}) {
   draft.addEventListener('input', clear);
   document.querySelector('#close-jwt').addEventListener('click', () => { clear(); draft.focus(); });
   // Refresh against the system clock even while an unchanged result stays open.
-  const timer = setInterval(updateExpiration, 1000);
   window.addEventListener('pagehide', () => clearInterval(timer), { once: true });
   return { clear, run };
 }

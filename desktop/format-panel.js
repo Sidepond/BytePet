@@ -1,12 +1,13 @@
 import { detectFormat } from './format.js';
 
-export function setupFormatPanel(draft, tools, clearResults) {
+export function setupFormatPanel(draft, tools, clearResults, enabled = () => true) {
   const mode = document.querySelector('#input-format');
   const run = document.querySelector('#run-tool');
   const hint = document.querySelector('#format-hint');
   let composing = false;
 
   function update() {
+    if (!enabled()) { run.disabled = true; hint.textContent = ''; return null; }
     if (composing) {
       run.disabled = true;
       hint.textContent = '입력을 마치면 형식을 확인해요.';

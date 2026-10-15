@@ -10,16 +10,31 @@ export function setupPortsPanel() {
   let hasSnapshot = false;
   let opening = false;
   let terminating = false;
+  let enabled = true;
+  let generation = 0;
+  function setEnabled(value) {
+    if (enabled === value) return;
+    enabled = value;
+    generation++;
+    busy = opening = terminating = false;
+    hasSnapshot = false;
+    list.replaceChildren();
+    status.textContent = refreshed.textContent = warning.textContent = actionStatus.textContent = '';
+    empty.hidden = warning.hidden = true;
+    list.setAttribute('aria-busy', 'false');
+    updateControls();
+  }
 
   function updateControls() {
-    button.disabled = busy || terminating;
+    button.disabled = !enabled || busy || terminating;
     for (const control of list.querySelectorAll('.open-port, .terminate-port')) {
       control.disabled = opening || terminating || busy || control.dataset.unavailable === 'true';
     }
   }
 
   async function terminatePort(item) {
-    if (terminating || opening || busy) return;
+    if (!enabled || terminating || opening || busy) return;
+    const current = generation;
     terminating = true;
     updateControls();
     actionStatus.classList.remove('error');
@@ -27,13 +42,16 @@ export function setupPortsPanel() {
     let refreshNeeded = true;
     try {
       const response = await window.ports.terminate(item.pid, item.port);
+      if (current !== generation) return;
       if (!response.ok) throw new Error(response.error);
       actionStatus.textContent = response.value.message;
       refreshNeeded = response.value.status !== 'cancelled';
     } catch (error) {
+      if (current !== generation) return;
       actionStatus.classList.add('error');
       actionStatus.textContent = error.message || '종료하지 못했어요. 새로고침 후 다시 확인해 주세요.';
     } finally {
+      if (current !== generation) return;
       terminating = false;
       if (refreshNeeded) await refresh();
       updateControls();
@@ -41,26 +59,31 @@ export function setupPortsPanel() {
   }
 
   async function openPort(item, feedback) {
-    if (opening || terminating || busy) return;
+    if (!enabled || opening || terminating || busy) return;
+    const current = generation;
     opening = true;
     updateControls();
     feedback.classList.remove('error');
     feedback.textContent = '기본 브라우저를 여는 중이에요…';
     try {
       const response = await window.ports.open(item.pid, item.port);
+      if (current !== generation) return;
       if (!response.ok) throw new Error(response.error);
       feedback.textContent = '기본 브라우저에 열기를 요청했어요.';
     } catch (error) {
+      if (current !== generation) return;
       feedback.classList.add('error');
       feedback.textContent = error.message || '브라우저를 열지 못했어요. 다시 시도해 주세요.';
     } finally {
+      if (current !== generation) return;
       opening = false;
       updateControls();
     }
   }
 
   async function refresh() {
-    if (busy || terminating) return;
+    if (!enabled || busy || terminating) return;
+    const current = generation;
     busy = true;
     updateControls();
     list.setAttribute('aria-busy', 'true');
@@ -68,6 +91,7 @@ export function setupPortsPanel() {
     status.textContent = '리스닝 포트를 조회하고 있어요…';
     try {
       const response = await window.ports.list();
+      if (current !== generation) return;
       if (!response.ok) throw new Error(response.error);
       const { items, checkedAt } = response.value;
       list.replaceChildren();
@@ -128,15 +152,17 @@ export function setupPortsPanel() {
       warning.textContent = response.value.warning || '';
       warning.hidden = !response.value.warning;
     } catch (error) {
+      if (current !== generation) return;
       empty.hidden = true;
       status.classList.add('error');
       status.textContent = `${error.message || '포트를 조회하지 못했어요.'}${hasSnapshot ? ' 이전 조회 결과를 표시하고 있어요.' : ''}`;
     } finally {
+      if (current !== generation) return;
       busy = false;
       updateControls();
       list.setAttribute('aria-busy', 'false');
     }
   }
   button.addEventListener('click', refresh);
-  return { refresh };
+  return { refresh, setEnabled };
 }

@@ -36,7 +36,7 @@ function createTerminator({ scan, inspect = readProcesses, confirm, react = () =
       }
       checkActive();
       const ports = [...new Set(current.items.filter(row => row.pid === item.pid).map(row => row.port))].sort((a, b) => a - b);
-      if (!(await confirm({ ...item, ports, command: before.command }))) return { ok: true, value: { status: 'cancelled', message: '종료를 취소했어요.' } };
+      if (!(await confirm({ ...item, ports, command: before.command }, { signal }))) return { ok: true, value: { status: 'cancelled', message: '종료를 취소했어요.' } };
       checkActive();
       // Recheck socket ownership and process identity after the confirmation dialog.
       const latest = await scan({ signal });

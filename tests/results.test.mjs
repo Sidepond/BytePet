@@ -146,3 +146,20 @@ test('reaction: attacks await a matching outcome and never overwrite newer feedi
   p.advance(RESULT_MS);
   assert.equal(p.history.at(-1).state, 'idle');
 });
+
+test('results: disabling M01 rejects new copies and reactions and invalidates pending completion', async () => {
+  let finish;
+  const s = service(() => new Promise(resolve => { finish = resolve; }));
+  const copy = s.handlers.get('results:copy');
+  const pending = copy(s.event, 'already submitted');
+  s.instance.setEnabled(false);
+  assert.equal((await copy(s.event, 'blocked')).ok, false);
+  s.listeners.get('results:react')(s.event, 'success');
+  assert.equal(s.messages.length, 0);
+  s.instance.setEnabled(true);
+  finish();
+  assert.equal((await pending).ok, false, 'OFF/ON does not revive an old completion');
+  const resumed = copy(s.event, 'new result');
+  finish();
+  assert.equal((await resumed).ok, true);
+});

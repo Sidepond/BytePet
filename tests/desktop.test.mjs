@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, readFile, writeFile, rm, realpath } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, writeFile, rm, realpath, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createServer } from 'node:net';
@@ -384,6 +384,7 @@ test('F04: pet click toggles a focused panel, text survives hiding, and drag nev
     await panel.waitForLoadState('load');
     await waitUntil(panelVisible);
     await panel.waitForFunction(() => document.activeElement?.id === 'draft');
+    await waitUntil(async () => await app.evaluate(({ BrowserWindow }) => BrowserWindow.getFocusedWindow()?.getTitle()) === 'BytePet 유틸리티');
     assert.equal(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getFocusedWindow()?.getTitle()), 'BytePet 유틸리티');
     await panel.keyboard.type('F04 focus check');
     assert.equal(await panel.locator('#draft').inputValue(), 'F04 focus check');
@@ -1305,5 +1306,204 @@ test('F12: unresponsive servers report failure without force kill; an already ex
     await panel.waitForFunction(() => document.querySelector('#port-action-status').textContent.includes('이미 종료'));
     await panel.waitForFunction(() => document.querySelector('#port-list').getAttribute('aria-busy') === 'false');
     assert.equal(await panel.locator(`#port-list li[data-pid="${child.pid}"]`).count(), 0);
+  } finally { await app.close(); }
+});
+
+async function setModule(panel, key, enabled) {
+  await panel.locator('#show-settings').click();
+  await panel.locator(`#module-${key}`).setChecked(enabled);
+  await panel.waitForFunction(() => !document.querySelector('#module-m01').disabled);
+}
+
+test('F13: module switches stop food tools and timers, retain drafts and shelf, and persist across restart', { timeout: 30000 }, async t => {
+  const profile = await profileFor(t);
+  let app = await launch(profile);
+  try {
+    const { pet, panel } = await openPanel(app);
+    const errors = [];
+    panel.on('pageerror', error => errors.push(error.message));
+    await panel.evaluate(() => {
+      const start = window.setInterval; const stop = window.clearInterval;
+      window.moduleIntervals = new Set();
+      window.setInterval = (...args) => { const id = start(...args); window.moduleIntervals.add(id); return id; };
+      window.clearInterval = id => { window.moduleIntervals.delete(id); stop(id); };
+    });
+    assert.equal((await pet.evaluate(() => window.modules.set('m01', false))).ok, false);
+    const saved = await panel.evaluate(() => window.food.saveText('keep this food'));
+    assert.equal(saved.ok, true);
+    const token = jwtToken({ exp: Math.floor(Date.now() / 1000) + 300 });
+    await panel.locator('#draft').fill(token);
+    await panel.locator('#run-tool').click();
+    assert.equal(await panel.evaluate(() => window.moduleIntervals.size), 1);
+    await setModule(panel, 'm01', false);
+    assert.equal(await panel.evaluate(() => window.moduleIntervals.size), 0);
+    assert.equal(await panel.locator('#jwt-result').isVisible(), false);
+    await pet.waitForFunction(() => document.querySelector('canvas').dataset.state === 'idle');
+    assert.equal((await panel.evaluate(() => window.food.saveText('blocked'))).ok, false);
+    assert.equal((await pet.evaluate(() => window.food.saveFiles([new File(['x'], 'blocked.txt')]))).ok, false);
+    assert.equal((await panel.evaluate(() => window.resultTools.copy('blocked'))).ok, false);
+    assert.equal((await panel.evaluate(() => window.food.list())).ok, false);
+    assert.equal((await panel.evaluate(() => window.ports.list())).ok, true, 'M02 remains independent');
+    await panel.evaluate(() => document.querySelector('#run-tool').click());
+    assert.equal(await panel.locator('#jwt-result').isVisible(), false);
+    await pet.evaluate(() => {
+      const data = new DataTransfer(); data.setData('text/plain', 'ignored paste');
+      document.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+    });
+    await panel.locator('#show-food').click();
+    assert.equal(await panel.locator('#module-off').isVisible(), true);
+    assert.equal(await panel.locator('#draft').inputValue(), token);
+    await panel.locator('#enable-module').click();
+    await panel.screenshot({ path: `${root}/test-results/f13-settings.png` });
+    await setModule(panel, 'm01', true);
+    await panel.locator('#show-food').click();
+    await panel.waitForFunction(() => document.querySelectorAll('#food-list li').length === 1);
+    assert.equal(await panel.locator('#draft').inputValue(), token);
+    assert.equal(await panel.evaluate(() => window.moduleIntervals.size), 0, 'old JWT result and timer do not resume');
+    assert.equal((await panel.evaluate(() => window.food.list())).value.length, 1);
+    await setModule(panel, 'm02', false);
+    for (const result of await panel.evaluate(async () => [await window.ports.list(), await window.ports.open(1, 3000), await window.ports.terminate(1, 3000)])) assert.equal(result.ok, false);
+    assert.equal((await panel.evaluate(() => window.food.list())).ok, true);
+    await setModule(panel, 'm01', false);
+    assert.deepEqual(JSON.parse(await readFile(path.join(profile, 'modules.json'), 'utf8')).modules, { m01: false, m02: false });
+    assert.deepEqual(errors, []);
+    await app.close();
+    app = await launch(profile);
+    const newPet = await app.firstWindow();
+    await newPet.waitForLoadState('load');
+    const opened = app.waitForEvent('window');
+    await newPet.evaluate(() => window.petPanel.toggle());
+    const restored = await opened;
+    await restored.waitForLoadState('load');
+    await restored.locator('#module-off').waitFor();
+    assert.equal((await restored.evaluate(() => window.food.list())).ok, false);
+    assert.equal((await restored.evaluate(() => window.ports.list())).ok, false);
+    await restored.locator('#show-settings').click();
+    assert.equal(await restored.locator('#module-m01').isChecked(), false);
+    assert.equal(await restored.locator('#module-m02').isChecked(), false);
+    await setModule(restored, 'm01', true);
+    assert.equal((await restored.evaluate(() => window.food.list())).value.length, 1);
+  } finally { await app.close(); }
+});
+
+test('F13: corrupt settings show a warning and failed writes preserve the current runtime and saved settings', { timeout: 30000 }, async t => {
+  const profile = await profileFor(t);
+  await writeFile(path.join(profile, 'modules.json'), '{broken');
+  const app = await launch(profile);
+  try {
+    const { panel } = await openPanel(app);
+    await panel.locator('#show-settings').click();
+    assert.match(await panel.locator('#settings-status').textContent(), /기본값/);
+    await setModule(panel, 'm02', false);
+    const saved = await readFile(path.join(profile, 'modules.json'), 'utf8');
+    const pid = await app.evaluate(() => process.pid);
+    const blocked = path.join(profile, `modules.json.${pid}.tmp`);
+    await mkdir(blocked);
+    await panel.locator('#module-m01').click();
+    await panel.waitForFunction(() => !document.querySelector('#module-m01').disabled);
+    assert.equal(await panel.locator('#module-m01').isChecked(), true);
+    assert.match(await panel.locator('#settings-status').textContent(), /저장하지 못/);
+    assert.equal(await panel.locator('#settings-status').evaluate(el => el.classList.contains('error')), true);
+    assert.equal((await panel.evaluate(() => window.food.list())).ok, true);
+    assert.equal((await panel.evaluate(() => window.ports.list())).ok, false);
+    assert.equal(await readFile(path.join(profile, 'modules.json'), 'utf8'), saved);
+    await rm(blocked, { recursive: true });
+    await setModule(panel, 'm01', false);
+    assert.equal(await panel.locator('#module-m01').isChecked(), false);
+    assert.match(await panel.locator('#settings-status').textContent(), /저장했어요/);
+  } finally { await app.close(); }
+});
+
+test('F13: turning food off cancels an in-flight write and late completion preserves the draft', { timeout: 30000 }, async t => {
+  const profile = await profileFor(t);
+  const app = await launch(profile);
+  try {
+    const { pet, panel } = await openPanel(app);
+    await app.evaluate(async () => {
+      const fs = process.getBuiltinModule('fs/promises');
+      const write = fs.writeFile;
+      fs.writeFile = async (...args) => {
+        if (String(args[0]).endsWith('text.txt') && args[1] === 'cancel pending food') {
+          globalThis.pendingFoodSignal = args[2].signal;
+          await new Promise(resolve => { globalThis.releasePendingFood = resolve; });
+        }
+        return write(...args);
+      };
+    });
+    await panel.locator('#draft').fill('cancel pending food');
+    await panel.locator('#feed-text').click();
+    await waitUntil(() => app.evaluate(() => Boolean(globalThis.releasePendingFood)));
+    await setModule(panel, 'm01', false);
+    assert.equal(await app.evaluate(() => globalThis.pendingFoodSignal.aborted), true);
+    await setModule(panel, 'm01', true);
+    await app.evaluate(() => globalThis.releasePendingFood());
+    await waitUntil(async () => !(await readdir(path.join(profile, 'food'))).some(name => name.startsWith('.pending-')));
+    await panel.locator('#show-food').click();
+    assert.equal(await panel.locator('#draft').inputValue(), 'cancel pending food');
+    assert.equal((await panel.evaluate(() => window.food.list())).value.length, 0);
+    assert.equal(await pet.locator('canvas').getAttribute('data-state'), 'idle');
+    await panel.locator('#feed-text').click();
+    // The second save has its own signal and can complete after re-enabling.
+    await waitUntil(() => app.evaluate(() => !globalThis.pendingFoodSignal.aborted));
+    await app.evaluate(() => globalThis.releasePendingFood());
+    await panel.waitForFunction(() => document.querySelector('#draft').value === '');
+    assert.equal((await panel.evaluate(() => window.food.list())).value.length, 1);
+  } finally { await app.close(); }
+});
+
+test('F13: disabling ports aborts a pending confirmation and ignores stale list responses after re-enable', { timeout: 30000 }, async t => {
+  const { child, ports } = await processServer(t);
+  const app = await launch(await profileFor(t));
+  try {
+    await app.evaluate(({ dialog }, pid) => {
+      dialog.showMessageBox = (_panel, options) => {
+        if (!options.detail.includes(`PID ${pid}\n`)) throw new Error('Unexpected target');
+        globalThis.pendingConfirmation = options.signal;
+        return new Promise(resolve => options.signal.addEventListener('abort', () => resolve({ response: 0 }), { once: true }));
+      };
+    }, child.pid);
+    const { pet, panel } = await openPanel(app);
+    await panel.locator('#show-ports').click();
+    const row = panel.locator(`#port-list li[data-pid="${child.pid}"][data-port="${ports[0]}"]`);
+    await row.waitFor();
+    await row.locator('.terminate-port').click();
+    await waitUntil(() => app.evaluate(() => Boolean(globalThis.pendingConfirmation)));
+    await setModule(panel, 'm02', false);
+    assert.equal(await app.evaluate(() => globalThis.pendingConfirmation.aborted), true);
+    assert.equal(child.exitCode, null);
+    await setModule(panel, 'm02', true);
+    await app.evaluate(({ ipcMain }) => {
+      globalThis.delayedPortCalls = 0;
+      ipcMain.removeHandler('ports:list');
+      ipcMain.handle('ports:list', () => {
+        globalThis.delayedPortCalls++;
+        if (globalThis.delayedPortCalls === 1) return new Promise(resolve => { globalThis.finishOldPorts = () => resolve({ ok: true, value: { items: [], checkedAt: '2000-01-01T00:00:00Z' } }); });
+        return { ok: true, value: { items: [], checkedAt: '2026-10-15T00:00:00Z' } };
+      });
+    });
+    await panel.locator('#show-ports').click();
+    await waitUntil(() => app.evaluate(() => Boolean(globalThis.finishOldPorts)));
+    await setModule(panel, 'm02', false);
+    await panel.locator('#show-ports').click();
+    assert.equal(await app.evaluate(() => globalThis.delayedPortCalls), 1);
+    await setModule(panel, 'm02', true);
+    await panel.locator('#show-ports').click();
+    await panel.waitForFunction(() => document.querySelector('#port-list').getAttribute('aria-busy') === 'false');
+    const updated = await panel.locator('#ports-updated').textContent();
+    await app.evaluate(() => globalThis.finishOldPorts());
+    assert.equal(await panel.locator('#ports-updated').textContent(), updated);
+    assert.equal(await panel.locator('#refresh-ports').isDisabled(), false);
+    assert.equal(await panel.locator('#port-action-status').textContent(), '');
+    await app.evaluate(({ BrowserWindow }) => {
+      const pet = BrowserWindow.getAllWindows().find(win => win.getTitle() === 'BytePet');
+      pet.webContents.send('ports:reaction', { id: 'message-lifecycle', phase: 'attack' });
+      pet.webContents.send('ports:reaction', { id: 'message-lifecycle', phase: 'success' });
+    });
+    await pet.waitForFunction(() => document.querySelector('canvas').dataset.state === 'success');
+    await pet.waitForFunction(() => document.querySelector('canvas').dataset.state === 'idle');
+    await setModule(panel, 'm01', false);
+    assert.equal(await pet.locator('#pet-message').isVisible(), true, 'M01 does not clear an M02 message');
+    await setModule(panel, 'm02', false);
+    await pet.waitForFunction(() => document.querySelector('#pet-message').hidden);
   } finally { await app.close(); }
 });

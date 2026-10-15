@@ -1,5 +1,15 @@
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
+contextBridge.exposeInMainWorld('modules', {
+  get: () => ipcRenderer.invoke('modules:get'),
+  set: (key, enabled) => ipcRenderer.invoke('modules:set', { key, enabled }),
+  onChanged: callback => {
+    const listener = (_event, state) => callback(state);
+    ipcRenderer.on('modules:changed', listener);
+    return () => ipcRenderer.removeListener('modules:changed', listener);
+  },
+});
+
 // Narrow bridges only; the renderer has no unrestricted file or clipboard access.
 contextBridge.exposeInMainWorld('petDrag', {
   start: (x, y) => ipcRenderer.send('pet:drag', 'start', { x, y }),
@@ -23,6 +33,7 @@ contextBridge.exposeInMainWorld('petPanel', {
 
 contextBridge.exposeInMainWorld('utilityPanel', {
   close: () => ipcRenderer.send('panel:close'),
+  ready: () => ipcRenderer.send('panel:ready'),
   onOpen: callback => {
     const listener = () => callback();
     ipcRenderer.on('panel:opened', listener);
@@ -56,8 +67,12 @@ contextBridge.exposeInMainWorld('food', {
   async saveFiles(files) {
     if (!Array.isArray(files) || files.length > 10) return { ok: false, error: '파일은 한 번에 10개까지 먹일 수 있어요.' };
     try {
+      const initial = await ipcRenderer.invoke('modules:get');
+      if (!initial.ok || !initial.value.modules.m01) return { ok: false, error: 'M01 먹이·변환이 꺼져 있어요.' };
       const sources = [];
       for (const file of files) {
+        const current = await ipcRenderer.invoke('modules:get');
+        if (!current.ok || !current.value.modules.m01 || current.value.epochs.m01 !== initial.value.epochs.m01) return { ok: false, error: '모듈 설정이 바뀌어 파일 읽기를 중단했어요.' };
         const source = { name: file.name };
         const filePath = webUtils.getPathForFile(file);
         if (file.size > 25 * 1024 * 1024) source.oversized = true;
@@ -65,6 +80,8 @@ contextBridge.exposeInMainWorld('food', {
         else source.bytes = new Uint8Array(await file.arrayBuffer());
         sources.push(source);
       }
+      const current = await ipcRenderer.invoke('modules:get');
+      if (!current.ok || !current.value.modules.m01 || current.value.epochs.m01 !== initial.value.epochs.m01) return { ok: false, error: '모듈 설정이 바뀌어 파일 읽기를 중단했어요.' };
       return ipcRenderer.invoke('food:save-files', sources);
     } catch { return { ok: false, error: '파일을 읽을 수 없어요. 다시 선택해 주세요.' }; }
   },
