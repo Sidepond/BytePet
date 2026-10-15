@@ -5,14 +5,45 @@ export function setupPortsPanel() {
   const refreshed = document.querySelector('#ports-updated');
   const warning = document.querySelector('#ports-warning');
   const button = document.querySelector('#refresh-ports');
+  const actionStatus = document.querySelector('#port-action-status');
   let busy = false;
   let hasSnapshot = false;
   let opening = false;
+  let terminating = false;
+
+  function updateControls() {
+    button.disabled = busy || terminating;
+    for (const control of list.querySelectorAll('.open-port, .terminate-port')) {
+      control.disabled = opening || terminating || busy || control.dataset.unavailable === 'true';
+    }
+  }
+
+  async function terminatePort(item) {
+    if (terminating || opening || busy) return;
+    terminating = true;
+    updateControls();
+    actionStatus.classList.remove('error');
+    actionStatus.textContent = `PID ${item.pid} 종료 대상을 확인하고 있어요…`;
+    let refreshNeeded = true;
+    try {
+      const response = await window.ports.terminate(item.pid, item.port);
+      if (!response.ok) throw new Error(response.error);
+      actionStatus.textContent = response.value.message;
+      refreshNeeded = response.value.status !== 'cancelled';
+    } catch (error) {
+      actionStatus.classList.add('error');
+      actionStatus.textContent = error.message || '종료하지 못했어요. 새로고침 후 다시 확인해 주세요.';
+    } finally {
+      terminating = false;
+      if (refreshNeeded) await refresh();
+      updateControls();
+    }
+  }
 
   async function openPort(item, feedback) {
-    if (opening) return;
+    if (opening || terminating || busy) return;
     opening = true;
-    for (const control of list.querySelectorAll('.open-port')) control.disabled = true;
+    updateControls();
     feedback.classList.remove('error');
     feedback.textContent = '기본 브라우저를 여는 중이에요…';
     try {
@@ -24,14 +55,14 @@ export function setupPortsPanel() {
       feedback.textContent = error.message || '브라우저를 열지 못했어요. 다시 시도해 주세요.';
     } finally {
       opening = false;
-      for (const control of list.querySelectorAll('.open-port')) control.disabled = control.dataset.unavailable === 'true';
+      updateControls();
     }
   }
 
   async function refresh() {
-    if (busy) return;
+    if (busy || terminating) return;
     busy = true;
-    button.disabled = true;
+    updateControls();
     list.setAttribute('aria-busy', 'true');
     status.classList.remove('error');
     status.textContent = '리스닝 포트를 조회하고 있어요…';
@@ -78,6 +109,15 @@ export function setupPortsPanel() {
         feedback.setAttribute('aria-live', 'polite');
         open.addEventListener('click', () => openPort(item, feedback));
         actions.append(open);
+        const terminate = document.createElement('button');
+        terminate.type = 'button';
+        terminate.className = 'terminate-port';
+        terminate.textContent = '프로세스 종료';
+        terminate.setAttribute('aria-label', `PID ${item.pid} 프로세스 종료`);
+        terminate.title = item.terminationBlocked || '프로세스의 모든 작업과 포트를 종료해요';
+        terminate.dataset.unavailable = String(Boolean(item.terminationBlocked));
+        terminate.addEventListener('click', () => terminatePort(item));
+        actions.append(terminate);
         row.append(url, actions, feedback);
         list.append(row);
       }
@@ -93,7 +133,7 @@ export function setupPortsPanel() {
       status.textContent = `${error.message || '포트를 조회하지 못했어요.'}${hasSnapshot ? ' 이전 조회 결과를 표시하고 있어요.' : ''}`;
     } finally {
       busy = false;
-      button.disabled = false;
+      updateControls();
       list.setAttribute('aria-busy', 'false');
     }
   }

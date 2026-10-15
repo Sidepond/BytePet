@@ -69,3 +69,7 @@ body.food-over main { box-shadow: inset 0 0 0 3px #459b8f; }
 .port-open-status { margin: 6px 0 0; color: #347b70; font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
 .port-open-status:empty { display: none; }
 .port-open-status.error { color: #a02d21; }
+.item-actions .terminate-port { color: #a02d21; border-color: #dbafa5; }
+#port-action-status { font-size: 11px; line-height: 1.5; color: #347b70; overflow-wrap: anywhere; }
+#port-action-status:empty { display: none; }
+#port-action-status.error { color: #a02d21; }

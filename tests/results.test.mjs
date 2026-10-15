@@ -118,3 +118,31 @@ test('reaction: the latest save or conversion replaces earlier timers; dispose c
   assert.equal(p.history.length, count);
   assert.equal(p.timers.size, 0);
 });
+
+test('reaction: attacks await a matching outcome and never overwrite newer feeding or conversion', () => {
+  const p = player();
+  p.controller.portReaction({ id: 'first', phase: 'attack' });
+  assert.equal(p.history.at(-1).state, 'attack');
+  p.advance(2000);
+  assert.equal(p.history.at(-1).state, 'attack', 'no success until exit is verified');
+  p.controller.portReaction({ id: 'first', phase: 'success' });
+  p.advance(0);
+  assert.equal(p.history.at(-1).state, 'success');
+  assert.equal(p.history.at(-1).source, 'ports');
+  p.advance(RESULT_MS);
+  assert.equal(p.history.at(-1).state, 'idle');
+  p.controller.portReaction({ id: 'second', phase: 'attack' });
+  p.controller.portReaction({ id: 'wrong', phase: 'success' });
+  assert.equal(p.history.at(-1).state, 'attack');
+  p.controller.play('eating');
+  p.controller.portReaction({ id: 'second', phase: 'failure' });
+  p.advance(100);
+  assert.equal(p.history.at(-1).state, 'eating');
+  p.controller.portReaction({ id: 'third', phase: 'attack' });
+  p.controller.portReaction({ id: 'third', phase: 'failure' });
+  assert.equal(p.history.at(-1).state, 'attack', 'quick exits still show an attack');
+  p.advance(650);
+  assert.equal(p.history.at(-1).state, 'failure');
+  p.advance(RESULT_MS);
+  assert.equal(p.history.at(-1).state, 'idle');
+});

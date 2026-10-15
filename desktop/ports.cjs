@@ -1,6 +1,8 @@
 const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
 const { isIP } = require('node:net');
+const { readProcesses } = require('./processes.cjs');
+const { createTerminator } = require('./terminate.cjs');
 
 const executeFile = promisify(execFile);
 const LSOF_ARGS = ['-nP', '-a', '-iTCP', '-sTCP:LISTEN', '+c', '0', '-F0pcfntP'];
@@ -96,12 +98,15 @@ function getPortUrl(item) {
   return candidates.sort((a, b) => a.rank - b.rank)[0]?.url || null;
 }
 
-function createPortService({ ipcMain, getPanel, scan = listListeningPorts, openExternal }) {
+function createPortService({ ipcMain, getPanel, scan = listListeningPorts, openExternal,
+  inspect = readProcesses, confirm, react, isProtected }) {
   let pending = null;
   let controller = null;
   let disposed = false;
   let snapshot = [];
   let opening = false;
+  let identities = new Map();
+  const terminator = createTerminator({ scan, inspect, confirm, react, isProtected });
   function allowed(event) {
     const panel = getPanel();
     return !disposed && panel && !panel.isDestroyed() && !panel.webContents.isDestroyed()
@@ -112,10 +117,14 @@ function createPortService({ ipcMain, getPanel, scan = listListeningPorts, openE
     if (!pending) {
       controller = new AbortController();
       const signal = controller.signal;
-      pending = Promise.resolve().then(() => scan({ signal }))
-        .then(value => {
+      pending = Promise.resolve().then(() => Promise.allSettled([scan({ signal }), inspect({ signal })]))
+        .then(([scanResult, processResult]) => {
           if (disposed) throw new PortError('포트 조회가 취소됐어요.');
-          snapshot = value.items.map(item => ({ ...item, url: getPortUrl(item) }));
+          if (scanResult.status === 'rejected') throw scanResult.reason;
+          const value = scanResult.value;
+          identities = processResult.status === 'fulfilled' ? processResult.value : new Map();
+          snapshot = value.items.map(item => ({ ...item, url: getPortUrl(item),
+            terminationBlocked: terminator.reason(identities.get(item.pid)) }));
           return { ok: true, value: { ...value, items: snapshot, checkedAt: new Date().toISOString() } };
         })
         .catch(error => ({ ok: false, error: error instanceof PortError ? error.message : '포트를 조회하지 못했어요. 다시 시도해 주세요.' }))
@@ -141,12 +150,20 @@ function createPortService({ ipcMain, getPanel, scan = listListeningPorts, openE
       return { ok: false, error: '기본 브라우저를 열지 못했어요. 브라우저 설정을 확인하고 다시 시도해 주세요.' };
     } finally { opening = false; }
   });
+  ipcMain.handle('ports:terminate', async (event, target) => {
+    if (!allowed(event)) return { ok: false, error: '허용되지 않은 요청이에요.' };
+    const item = target && snapshot.find(item => item.pid === target.pid && item.port === target.port);
+    if (!item) return { ok: false, error: '목록을 새로고침하고 종료할 포트를 선택해 주세요.' };
+    return terminator.terminate(item, identities.get(item.pid), () => allowed(event));
+  });
   return { dispose() {
     disposed = true;
     snapshot = [];
     controller?.abort();
+    terminator.dispose();
     ipcMain.removeHandler('ports:list');
     ipcMain.removeHandler('ports:open');
+    ipcMain.removeHandler('ports:terminate');
   } };
 }
 

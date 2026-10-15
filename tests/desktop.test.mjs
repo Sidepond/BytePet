@@ -4,6 +4,7 @@ import { mkdir, mkdtemp, readFile, writeFile, rm, realpath } from 'node:fs/promi
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createServer } from 'node:net';
+import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { _electron as electron } from 'playwright';
 import { getInitialBounds } from '../desktop/window.cjs';
@@ -1195,5 +1196,114 @@ test('F11: opens a listed port through the default browser, handles pending laun
     assert.equal((await panel.evaluate(({ pid, port }) => window.ports.open(pid, port), { pid: process.pid, port })).ok, false);
     assert.equal((await app.evaluate(() => globalThis.openedPortUrls)).length, 3);
     assert.deepEqual(errors, []);
+  } finally { await app.close(); }
+});
+
+
+async function processServer(t, ignoreTermination = false) {
+  const child = spawn(process.execPath, ['-e', `
+    const net = require('node:net');
+    const servers = [net.createServer(), net.createServer()];
+    Promise.all(servers.map(server => new Promise(resolve => server.listen(0, '127.0.0.1', resolve))))
+      .then(() => process.send(servers.map(server => server.address().port)));
+    process.on('SIGTERM', () => { if (!${ignoreTermination}) setTimeout(() => process.exit(0), 500); });
+  `], { stdio: ['ignore', 'ignore', 'pipe', 'ipc'] });
+  const exited = new Promise(resolve => child.once('exit', resolve));
+  t.after(async () => { if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL'); await exited; });
+  const ports = await new Promise((resolve, reject) => {
+    child.once('message', resolve);
+    child.once('error', reject);
+    child.once('exit', () => reject(new Error('Test server exited before listening')));
+  });
+  return { child, ports, exited };
+}
+
+test('F12: confirms the process, cancels safely, terminates an owned test server and refreshes every port', { timeout: 30000 }, async t => {
+  const { child, ports, exited } = await processServer(t);
+  const app = await launch(await profileFor(t));
+  try {
+    await app.evaluate(({ dialog }, pid) => {
+      globalThis.terminationDialogs = [];
+      dialog.showMessageBox = (_panel, options) => {
+        if (!options.detail.includes(`PID ${pid}\n`)) throw new Error('Unexpected termination target');
+        globalThis.terminationDialogs.push(options);
+        return new Promise(resolve => { globalThis.answerTermination = response => resolve({ response }); });
+      };
+    }, child.pid);
+    const { pet, panel } = await openPanel(app);
+    await panel.locator('#show-ports').click();
+    const row = panel.locator(`#port-list li[data-pid="${child.pid}"][data-port="${ports[0]}"]`);
+    await row.waitFor();
+    const stop = row.locator('.terminate-port');
+    assert.equal(await stop.isDisabled(), false);
+    const target = { pid: child.pid, port: ports[0] };
+    assert.equal((await pet.evaluate(x => window.ports.terminate(x.pid, x.port), target)).ok, false);
+    assert.equal((await panel.evaluate(() => window.ports.terminate(-1, 3000))).ok, false);
+    await stop.click();
+    await waitUntil(async () => (await app.evaluate(() => globalThis.terminationDialogs.length)) === 1);
+    const detail = await app.evaluate(() => globalThis.terminationDialogs[0]);
+    assert.equal(detail.defaultId, 0);
+    assert.equal(detail.cancelId, 0);
+    assert.deepEqual(detail.buttons, ['취소', '프로세스 종료']);
+    for (const port of ports) assert.ok(detail.detail.includes(String(port)));
+    assert.ok(detail.detail.includes(`PID ${child.pid}`));
+    assert.equal((await panel.evaluate(x => window.ports.terminate(x.pid, x.port), target)).ok, false);
+    assert.equal(await panel.locator('#refresh-ports').isDisabled(), true);
+    await app.evaluate(() => globalThis.answerTermination(0));
+    await waitUntil(async () => !(await stop.isDisabled()));
+    assert.match(await panel.locator('#port-action-status').textContent(), /취소/);
+    assert.equal(child.exitCode, null);
+    assert.equal(await pet.locator('canvas').getAttribute('data-state'), null);
+
+    await stop.click();
+    await waitUntil(async () => (await app.evaluate(() => globalThis.terminationDialogs.length)) === 2);
+    await app.evaluate(() => globalThis.answerTermination(1));
+    await pet.waitForFunction(() => document.querySelector('canvas').dataset.state === 'attack');
+    await mkdir(path.join(root, 'test-results'), { recursive: true });
+    await pet.screenshot({ path: `${root}/test-results/f12-attack.png` });
+    await exited;
+    await panel.waitForFunction(() => document.querySelector('#port-action-status').textContent.includes('프로세스를 종료했어요'));
+    await panel.waitForFunction(() => document.querySelector('#port-list').getAttribute('aria-busy') === 'false');
+    assert.equal(await panel.locator(`#port-list li[data-pid="${child.pid}"]`).count(), 0);
+    await pet.waitForFunction(() => document.querySelector('canvas').dataset.state === 'success');
+    assert.match(await pet.locator('#pet-message').textContent(), /프로세스를 종료/);
+    await panel.screenshot({ path: `${root}/test-results/f12-terminated.png` });
+    await pet.waitForFunction(() => document.querySelector('canvas').dataset.state === 'idle');
+  } finally { await app.close(); }
+});
+
+test('F12: unresponsive servers report failure without force kill; an already exited process refreshes away', { timeout: 30000 }, async t => {
+  const { child, ports, exited } = await processServer(t, true);
+  const app = await launch(await profileFor(t));
+  try {
+    await app.evaluate(({ dialog }, pid) => {
+      dialog.showMessageBox = async (_panel, options) => {
+        if (!options.detail.includes(`PID ${pid}\n`)) throw new Error('Unexpected termination target');
+        return { response: 1 };
+      };
+    }, child.pid);
+    const { pet, panel } = await openPanel(app);
+    await pet.emulateMedia({ reducedMotion: 'reduce' });
+    await panel.locator('#show-ports').click();
+    const row = panel.locator(`#port-list li[data-pid="${child.pid}"][data-port="${ports[0]}"]`);
+    await row.waitFor();
+    await row.locator('.terminate-port').click();
+    await pet.waitForFunction(() => document.querySelector('canvas').dataset.state === 'attack');
+    const frame = await pet.locator('canvas').evaluate(canvas => canvas.toDataURL());
+    await new Promise(resolve => setTimeout(resolve, 250));
+    assert.equal(await pet.locator('canvas').evaluate(canvas => canvas.toDataURL()), frame, 'reduced motion keeps the attack static');
+    await panel.waitForFunction(() => document.querySelector('#port-action-status').textContent.includes('아직 실행 중'));
+    await panel.waitForFunction(() => document.querySelector('#port-list').getAttribute('aria-busy') === 'false');
+    assert.equal(await row.count(), 1);
+    assert.equal(child.exitCode, null);
+    await pet.waitForFunction(() => document.querySelector('canvas').dataset.state === 'failure');
+    assert.match(await pet.locator('#pet-message').textContent(), /종료 결과/);
+    await panel.screenshot({ path: `${root}/test-results/f12-timeout.png` });
+    child.kill('SIGKILL'); // Only this test's own deliberately unresponsive child.
+    await exited;
+    await row.locator('.terminate-port').click();
+    await panel.waitForFunction(() => document.querySelector('#port-action-status').textContent.includes('이미 종료'));
+    await panel.waitForFunction(() => document.querySelector('#port-list').getAttribute('aria-busy') === 'false');
+    assert.equal(await panel.locator(`#port-list li[data-pid="${child.pid}"]`).count(), 0);
   } finally { await app.close(); }
 });

@@ -83,6 +83,7 @@ test('ports: IPC checks the panel main frame, shares pending scans, retries, and
   const service = createPortService({
     ipcMain: { handle: (key, fn) => { if (key === 'ports:list') handler = fn; }, removeHandler: key => removed.push(key) },
     getPanel: () => panel,
+    inspect: async () => new Map(),
     scan: ({ signal }) => {
       calls++;
       scanSignal = signal;
@@ -108,7 +109,7 @@ test('ports: IPC checks the panel main frame, shares pending scans, retries, and
   assert.equal(calls, 2);
   service.dispose();
   assert.equal(scanSignal.aborted, true);
-  assert.deepEqual(removed, ['ports:list', 'ports:open']);
+  assert.deepEqual(removed, ['ports:list', 'ports:open', 'ports:terminate']);
   assert.equal((await next).ok, false);
   assert.equal(handler(event).ok, false);
 });
@@ -147,6 +148,7 @@ test('ports: opening uses only the latest trusted snapshot, rejects unauthorized
   const service = createPortService({
     ipcMain: { handle: (key, fn) => handlers.set(key, fn), removeHandler: key => handlers.delete(key) },
     getPanel: () => panel,
+    inspect: async () => new Map(),
     scan: async () => { if (scanError) throw new Error('private diagnostic'); return { items, warning: null }; },
     openExternal: url => {
       opened.push(url);

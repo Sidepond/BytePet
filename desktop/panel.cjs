@@ -1,4 +1,4 @@
-const { BrowserWindow, ipcMain, screen, clipboard, shell } = require('electron');
+const { BrowserWindow, ipcMain, screen, clipboard, shell, dialog, app } = require('electron');
 const path = require('node:path');
 const { getPanelBounds } = require('./window.cjs');
 const { createFoodService } = require('./food.cjs');
@@ -11,7 +11,21 @@ function createUtilityPanel(pet) {
   let ready = false;
   const food = createFoodService(pet, () => panel);
   const results = createResultService({ ipcMain, clipboard, pet, getPanel: () => panel });
-  const ports = createPortService({ ipcMain, getPanel: () => panel, openExternal: url => shell.openExternal(url) });
+  const ports = createPortService({
+    ipcMain, getPanel: () => panel, openExternal: url => shell.openExternal(url),
+    isProtected: pid => pid <= 1 || pid === process.pid || app.getAppMetrics().some(info => info.pid === pid),
+    confirm: async item => {
+      const result = await dialog.showMessageBox(panel, {
+        type: 'warning', title: '프로세스 종료', message: `${item.name} 프로세스를 종료할까요?`,
+        detail: `PID ${item.pid}\n실행 파일: ${item.command}\n확인된 포트: ${item.ports.join(', ')}\n\n이 프로세스의 모든 작업과 포트가 함께 종료됩니다. 저장하지 않은 작업은 사라질 수 있어요.`,
+        buttons: ['취소', '프로세스 종료'], defaultId: 0, cancelId: 0, noLink: true,
+      });
+      return result.response === 1;
+    },
+    react: reaction => {
+      if (!pet.isDestroyed() && !pet.webContents.isDestroyed()) pet.webContents.send('ports:reaction', reaction);
+    },
+  });
 
   function publish() {
     // The renderer can be destroyed before the native parent window closes.

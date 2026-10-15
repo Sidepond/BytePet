@@ -152,3 +152,18 @@ export function drawResultCat(ctx, state, elapsed) {
   ctx.fillRect(21, y + 2, 1, 1);
   ctx.fillRect(21, y + 4, 1, 1);
 }
+
+export function drawAttackCat(ctx, elapsed) {
+  drawCat(ctx, 0);
+  const extended = Math.floor(elapsed / 130) % 4 >= 1;
+  // Lift the right paw, then swipe outwards with a small impact spark.
+  paintRows(ctx, extended ? ['ooooo', 'offfo', 'occco', '.ooo.'] : ['ooo', 'ofo', 'oco', 'ooo'], extended ? 17 : 15, 13);
+  ctx.fillStyle = palette.o;
+  ctx.fillRect(8, 8, 2, 1);
+  ctx.fillRect(15, 8, 2, 1);
+  if (extended) {
+    ctx.fillStyle = '#ffe293';
+    ctx.fillRect(22, 10, 1, 3);
+    ctx.fillRect(21, 11, 3, 1);
+  }
+}

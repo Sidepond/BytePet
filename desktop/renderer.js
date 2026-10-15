@@ -1,4 +1,4 @@
-import { drawCat, drawEatingCat, drawResultCat } from './cat.js';
+import { drawCat, drawEatingCat, drawResultCat, drawAttackCat } from './cat.js';
 import { createReactionPlayer } from './reaction.js';
 import { enableDragging } from './drag.js';
 import { isCanvasHit, createHitRegionReporter } from './hit-test.js';
@@ -26,8 +26,9 @@ const reactions = createReactionPlayer(next => {
   reaction = next;
   canvas.dataset.state = next.state;
   if (next.state === 'processing') showMessage('냠냠…');
-  if (next.state === 'success') showMessage('변환했어요!');
-  if (next.state === 'failure') showMessage('입력을 확인해 주세요');
+  if (next.state === 'attack') showMessage('얍! 종료를 요청했어요');
+  if (next.state === 'success') showMessage(next.source === 'ports' ? '프로세스를 종료했어요!' : '변환했어요!');
+  if (next.state === 'failure') showMessage(next.source === 'ports' ? '종료 결과를 확인해 주세요' : '입력을 확인해 주세요');
   updateAnimation();
 });
 function showMessage(text) {
@@ -57,10 +58,12 @@ window.food.onSaved(({ count }) => {
   showMessage(`냠냠! ${count}개 저장했어요`);
 });
 window.resultTools.onReaction(outcome => reactions.play(outcome));
+window.ports.onReaction(reaction => reactions.portReaction(reaction));
 
 function render() {
   const elapsed = performance.now() - reaction.startedAt;
   if (reaction.state === 'eating') drawEatingCat(ctx, reducedMotion.matches ? 1500 : elapsed);
+  else if (reaction.state === 'attack') drawAttackCat(ctx, reducedMotion.matches ? 150 : elapsed);
   else if (reaction.state === 'processing') drawEatingCat(ctx, reducedMotion.matches ? 700 : 400 + elapsed % 900);
   else if (reaction.state === 'success' || reaction.state === 'failure') drawResultCat(ctx, reaction.state, reducedMotion.matches ? 0 : elapsed);
   else drawCat(ctx, reducedMotion.matches ? 0 : performance.now() - startedAt);

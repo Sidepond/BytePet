@@ -43,6 +43,12 @@ contextBridge.exposeInMainWorld('resultTools', {
 contextBridge.exposeInMainWorld('ports', {
   list: () => ipcRenderer.invoke('ports:list'),
   open: (pid, port) => ipcRenderer.invoke('ports:open', { pid, port }),
+  terminate: (pid, port) => ipcRenderer.invoke('ports:terminate', { pid, port }),
+  onReaction: callback => {
+    const listener = (_event, reaction) => callback(reaction);
+    ipcRenderer.on('ports:reaction', listener);
+    return () => ipcRenderer.removeListener('ports:reaction', listener);
+  },
 });
 
 contextBridge.exposeInMainWorld('food', {
