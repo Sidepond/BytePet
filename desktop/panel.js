@@ -2,6 +2,7 @@ import { enableFoodDrop, resultMessage } from './feeding.js';
 import { setupJwtPanel } from './jwt-panel.js';
 import { setupJsonPanel } from './json-panel.js';
 import { setupFormatPanel } from './format-panel.js';
+import { setupPortsPanel } from './ports-panel.js';
 
 const draft = document.querySelector('#draft');
 const jwt = setupJwtPanel(draft, () => json.clear());
@@ -12,6 +13,21 @@ function draftChanged() { clearResults(); updateFormat(); }
 const status = document.querySelector('#feed-status');
 const list = document.querySelector('#food-list');
 const files = document.querySelector('#files');
+const ports = setupPortsPanel();
+let view = 'food';
+function showView(next) {
+  view = next;
+  document.querySelector('#food-view').hidden = next !== 'food';
+  document.querySelector('#ports-view').hidden = next !== 'ports';
+  document.querySelector('#show-food').setAttribute('aria-pressed', String(next === 'food'));
+  document.querySelector('#show-ports').setAttribute('aria-pressed', String(next === 'ports'));
+  document.querySelector('#panel-title').textContent = next === 'ports' ? '개발 포트' : '오늘의 먹이';
+  window.scrollTo(0, 0);
+  if (next === 'ports') ports.refresh();
+  else draft.focus({ preventScroll: true });
+}
+document.querySelector('#show-food').addEventListener('click', () => showView('food'));
+document.querySelector('#show-ports').addEventListener('click', () => showView('ports'));
 let busy = false;
 let listVersion = 0;
 function feedback(text, error = false) {
@@ -93,8 +109,9 @@ document.querySelector('#open-folder').addEventListener('click', async () => {
   const result = await window.food.folder();
   if (!result.ok) feedback(result.error, true);
 });
-enableFoodDrop(document.body, consume);
+enableFoodDrop(document.body, consume, () => view === 'food');
 document.addEventListener('paste', event => {
+  if (view !== 'food') return;
   const images = Array.from(event.clipboardData.files);
   if (images.length) {
     event.preventDefault();
@@ -113,6 +130,9 @@ document.addEventListener('keydown', event => {
     window.utilityPanel.close();
   }
 });
-window.utilityPanel.onOpen(() => { draft.focus({ preventScroll: true }); refresh(); });
+window.utilityPanel.onOpen(() => {
+  if (view === 'ports') { document.querySelector('#show-ports').focus({ preventScroll: true }); ports.refresh(); }
+  else { draft.focus({ preventScroll: true }); refresh(); }
+});
 window.food.onSaved(({ count }) => { feedback(`${count}개를 보관함에 저장했어요.`); refresh(); });
 refresh();

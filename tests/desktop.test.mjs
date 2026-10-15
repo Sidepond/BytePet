@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, readFile, writeFile, rm, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { createServer } from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { _electron as electron } from 'playwright';
 import { getInitialBounds } from '../desktop/window.cjs';
@@ -1014,5 +1015,115 @@ test('F09: chewing, success/failure, reduced motion, and newer feeding return to
     await panel.locator('#run-tool').click();
     await pet.waitForFunction(() => document.querySelector('canvas').dataset.state === 'failure');
     await pet.waitForFunction(() => document.querySelector('canvas').dataset.state === 'idle');
+  } finally { await app.close(); }
+});
+
+test('F10: real TCP listeners show port, PID, name and address; refresh reflects closure', { timeout: 30000 }, async t => {
+  const server = createServer();
+  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
+  const port = server.address().port;
+  t.after(() => { if (server.listening) server.close(); });
+  const app = await launch(await profileFor(t));
+  try {
+    const { pet, panel } = await openPanel(app);
+    const errors = [];
+    panel.on('pageerror', error => errors.push(error.message));
+    const input = '{"keep":"my draft"}';
+    await panel.locator('#draft').fill(input);
+    await panel.locator('#run-tool').click();
+    const result = await panel.locator('#json-output').textContent();
+    await panel.locator('#show-ports').click();
+    const row = panel.locator(`#port-list li[data-port="${port}"][data-pid="${process.pid}"]`);
+    await row.waitFor();
+    assert.match(await row.textContent(), new RegExp(`:${port}.*TCP · PID ${process.pid}.*127\\.0\\.0\\.1`, 's'));
+    assert.ok((await row.locator('.port-name').textContent()).length > 0);
+    assert.equal(await panel.locator('#show-ports').getAttribute('aria-pressed'), 'true');
+    assert.equal(await panel.locator('#food-view').isVisible(), false);
+    assert.match(await panel.locator('#ports-updated').textContent(), /마지막 조회/);
+    assert.equal((await pet.evaluate(() => window.ports.list())).ok, false, 'pet renderer cannot query processes');
+    await mkdir(path.join(root, 'test-results'), { recursive: true });
+    await panel.screenshot({ path: `${root}/test-results/f10-ports.png` });
+    await new Promise(resolve => server.close(resolve));
+    await panel.locator('#refresh-ports').click();
+    await panel.waitForFunction(() => document.querySelector('#port-list').getAttribute('aria-busy') === 'false');
+    assert.equal(await row.count(), 0);
+    await panel.keyboard.press('Escape');
+    await pet.evaluate(() => window.petPanel.toggle());
+    await panel.waitForFunction(() => document.activeElement?.id === 'show-ports');
+    assert.equal(await panel.locator('#ports-view').isVisible(), true);
+    await panel.locator('#show-food').click();
+    assert.equal(await panel.locator('#draft').inputValue(), input);
+    assert.equal(await panel.locator('#json-output').textContent(), result);
+    assert.equal(await panel.locator('#draft').evaluate(el => document.activeElement === el), true);
+    assert.deepEqual(errors, []);
+  } finally { await app.close(); }
+});
+
+test('F10: loading, empty lists, partial results, failures and retries preserve the right snapshot', { timeout: 30000 }, async t => {
+  const app = await launch(await profileFor(t));
+  try {
+    const { panel } = await openPanel(app);
+    await app.evaluate(({ ipcMain }) => {
+      globalThis.portCalls = 0;
+      globalThis.portMode = 'pending';
+      const good = () => ({ ok: true, value: {
+        items: [{ pid: 456, port: 3000, name: '<img src=x onerror=alert(1)>', addresses: [{ family: 'IPv4', address: '127.0.0.1' }] }],
+        checkedAt: '2026-10-15T00:00:00.000Z', warning: '일부 항목을 조회하지 못했을 수 있어요.',
+      } });
+      ipcMain.removeHandler('ports:list');
+      ipcMain.handle('ports:list', () => {
+        globalThis.portCalls++;
+        if (globalThis.portMode === 'pending') return new Promise(resolve => { globalThis.finishPorts = () => resolve(good()); });
+        if (globalThis.portMode === 'failure') return { ok: false, error: '포트 조회 시간이 초과됐어요. 다시 시도해 주세요.' };
+        return { ok: true, value: { items: [], checkedAt: '2026-10-15T00:00:01.000Z', warning: null } };
+      });
+    });
+    assert.equal(await app.evaluate(() => globalThis.portCalls), 0, 'food view does not scan in the background');
+    await panel.locator('#draft').fill('keep this');
+    await panel.locator('#show-ports').click();
+    assert.equal(await panel.locator('#refresh-ports').isDisabled(), true);
+    assert.match(await panel.locator('#port-status').textContent(), /조회하고/);
+    await panel.locator('#show-ports').click();
+    assert.equal(await app.evaluate(() => globalThis.portCalls), 1, 'repeated navigation shares the pending refresh');
+    // The port view does not accidentally turn pasted or dropped text into food.
+    await panel.evaluate(() => {
+      const data = new DataTransfer();
+      data.setData('text/plain', 'not food');
+      document.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+      document.body.dispatchEvent(new DragEvent('drop', { dataTransfer: data, bubbles: true, cancelable: true }));
+    });
+    assert.equal((await panel.evaluate(() => window.food.list())).value.length, 0);
+    await panel.locator('#show-food').click();
+    await app.evaluate(() => globalThis.finishPorts());
+    await panel.waitForFunction(() => document.querySelector('#port-list').getAttribute('aria-busy') === 'false');
+    assert.equal(await panel.locator('#draft').inputValue(), 'keep this');
+    assert.equal(await panel.locator('#draft').evaluate(el => document.activeElement === el), true, 'background completion does not steal focus');
+    assert.equal(await panel.locator('#port-list img').count(), 0);
+    assert.match(await panel.locator('.port-name').textContent(), /<img/);
+    assert.match(await panel.locator('#ports-warning').textContent(), /일부 항목/);
+    const timestamp = await panel.locator('#ports-updated').textContent();
+    await app.evaluate(() => { globalThis.portMode = 'failure'; });
+    await panel.locator('#show-ports').click();
+    await panel.waitForFunction(() => document.querySelector('#port-status').classList.contains('error'));
+    assert.equal(await panel.locator('#port-list li').count(), 1);
+    assert.equal(await panel.locator('#ports-updated').textContent(), timestamp);
+    assert.match(await panel.locator('#port-status').textContent(), /이전 조회 결과/);
+    assert.equal(await panel.locator('#empty-ports').isVisible(), false);
+    assert.equal(await panel.locator('#refresh-ports').isDisabled(), false);
+    await app.evaluate(() => { globalThis.portMode = 'empty'; });
+    await panel.locator('#refresh-ports').click();
+    await panel.waitForFunction(() => !document.querySelector('#empty-ports').hidden);
+    assert.equal(await panel.locator('#port-list li').count(), 0);
+    assert.match(await panel.locator('#port-status').textContent(), /0개 포트 항목/);
+    assert.equal(await panel.locator('#ports-warning').isVisible(), false);
+    await panel.screenshot({ path: `${root}/test-results/f10-empty.png` });
+    await app.evaluate(() => { globalThis.portMode = 'failure'; });
+    await panel.reload();
+    await panel.waitForLoadState('load');
+    await panel.locator('#show-ports').click();
+    await panel.waitForFunction(() => document.querySelector('#port-status').classList.contains('error'));
+    assert.doesNotMatch(await panel.locator('#port-status').textContent(), /이전 조회 결과/);
+    assert.equal(await panel.locator('#empty-ports').isVisible(), false);
+    assert.equal(await panel.locator('#ports-updated').textContent(), '');
   } finally { await app.close(); }
 });

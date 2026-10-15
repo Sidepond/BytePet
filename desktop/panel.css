@@ -51,3 +51,17 @@ body.food-over main { box-shadow: inset 0 0 0 3px #459b8f; }
 .copy-status { font-size: 11px; line-height: 1.5; color: #347b70; margin: 7px 0 0; }
 .copy-status:empty { display: none; }
 .copy-status.error { color: #a02d21; }
+.panel-views { display: flex; gap: 6px; margin-bottom: 18px; }
+.panel-views button { flex: 1; border: 1px solid #d8c6ac; border-radius: 6px; padding: 8px; font: inherit; font-size: 12px; background: #fffefb; color: #53382f; cursor: pointer; }
+.panel-views button[aria-pressed="true"] { background: #53382f; color: #fffaf0; border-color: #53382f; }
+.port-hint, #ports-updated, #ports-warning, #empty-ports { font-size: 11px; line-height: 1.5; color: #78685c; }
+#port-status { font-size: 12px; line-height: 1.5; color: #347b70; margin: 12px 0 5px; }
+#port-status.error { color: #a02d21; }
+#ports-updated { margin: 0 0 10px; }
+#ports-warning { color: #785312; }
+#port-list { list-style: none; padding: 0; margin: 0; max-height: 260px; overflow-y: auto; }
+#port-list li { padding: 10px 0; border-bottom: 1px solid #e7d9c6; }
+.port-heading { display: flex; align-items: baseline; gap: 10px; font-size: 13px; }
+.port-heading strong { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.port-name { min-width: 0; overflow-wrap: anywhere; }
+.port-meta, .port-addresses { margin: 5px 0 0; color: #78685c; font-size: 11px; overflow-wrap: anywhere; }

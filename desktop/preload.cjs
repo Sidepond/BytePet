@@ -40,6 +40,10 @@ contextBridge.exposeInMainWorld('resultTools', {
   },
 });
 
+contextBridge.exposeInMainWorld('ports', {
+  list: () => ipcRenderer.invoke('ports:list'),
+});
+
 contextBridge.exposeInMainWorld('food', {
   saveText: text => ipcRenderer.invoke('food:save-text', text),
   async saveFiles(files) {

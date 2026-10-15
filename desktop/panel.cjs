@@ -3,6 +3,7 @@ const path = require('node:path');
 const { getPanelBounds } = require('./window.cjs');
 const { createFoodService } = require('./food.cjs');
 const { createResultService } = require('./results.cjs');
+const { createPortService } = require('./ports.cjs');
 
 function createUtilityPanel(pet) {
   let panel;
@@ -10,6 +11,7 @@ function createUtilityPanel(pet) {
   let ready = false;
   const food = createFoodService(pet, () => panel);
   const results = createResultService({ ipcMain, clipboard, pet, getPanel: () => panel });
+  const ports = createPortService({ ipcMain, getPanel: () => panel });
 
   function publish() {
     // The renderer can be destroyed before the native parent window closes.
@@ -79,6 +81,7 @@ function createUtilityPanel(pet) {
     dispose() {
       food.dispose();
       results.dispose();
+      ports.dispose();
       ipcMain.removeListener('pet:panel-toggle', toggle);
       ipcMain.removeListener('panel:close', close);
       if (panel && !panel.isDestroyed()) panel.destroy();

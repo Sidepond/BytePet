@@ -13,6 +13,11 @@
         <div><p class="brand">BYTEPET <span>●</span></p><h1 id="panel-title">오늘의 먹이</h1></div>
         <button id="close" type="button" aria-label="패널 닫기" title="닫기 (Esc)">×</button>
       </header>
+      <nav class="panel-views" aria-label="패널 보기">
+        <button id="show-food" type="button" aria-pressed="true" aria-controls="food-view">먹이·변환</button>
+        <button id="show-ports" type="button" aria-pressed="false" aria-controls="ports-view">개발 포트</button>
+      </nav>
+      <section id="food-view" aria-label="먹이와 변환">
       <label for="draft">텍스트 먹이</label>
       <textarea id="draft" spellcheck="false" placeholder="텍스트를 붙여넣거나, 파일·사진을 여기로 드롭하세요." aria-describedby="draft-hint"></textarea>
       <p id="draft-hint">텍스트 1MB · 파일당 25MB · 한 번에 10개</p>
@@ -65,7 +70,17 @@
         <ul id="food-list" aria-label="저장된 먹이"></ul>
         <p id="empty-shelf">아직 먹이가 없어요. 첫 먹이를 주세요!</p>
       </section>
-      <footer>포트 확인은 준비 중<kbd>Esc 닫기</kbd></footer>
+      </section>
+      <section id="ports-view" aria-label="개발 포트 목록" hidden>
+        <div class="shelf-header"><h2>TCP 리스닝 포트</h2><button id="refresh-ports" type="button">새로고침</button></div>
+        <p class="port-hint">현재 사용자 권한으로 확인 가능한 포트입니다. *는 모든 인터페이스에서 수신하는 주소예요.</p>
+        <p id="port-status" role="status" aria-live="polite"></p>
+        <p id="ports-updated"></p>
+        <p id="ports-warning" hidden></p>
+        <ul id="port-list" aria-label="리스닝 포트" aria-busy="false"></ul>
+        <p id="empty-ports" hidden>조회 가능한 TCP 리스닝 포트가 없어요.</p>
+      </section>
+      <footer>포트 주소 열기·종료는 준비 중<kbd>Esc 닫기</kbd></footer>
     </main>
     <script type="module" src="panel.js"></script>
   </body>
