@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseListeningPorts, listListeningPorts, createPortService, PortError } from '../desktop/ports.cjs';
+import { parseListeningPorts, listListeningPorts, getPortUrl, createPortService, PortError } from '../desktop/ports.cjs';
 
 const record = (pid, name, sockets) => `p${pid}\0c${name}\0\n` + sockets.map((s, index) =>
   `f${index + 3}\0t${s.family || 'IPv4'}\0P${s.protocol || 'TCP'}\0n${s.name}\0\n`).join('');
@@ -74,14 +74,14 @@ test('ports: distinguishes tool failures and incomplete results from an empty sn
 
 test('ports: IPC checks the panel main frame, shares pending scans, retries, and aborts on disposal', async () => {
   let handler;
-  let removed = false;
+  const removed = [];
   let calls = 0;
   let finish;
   let scanSignal;
   const panel = { isDestroyed: () => false, webContents: { isDestroyed: () => false, mainFrame: {} } };
   const event = { sender: panel.webContents, senderFrame: panel.webContents.mainFrame };
   const service = createPortService({
-    ipcMain: { handle: (_key, fn) => { handler = fn; }, removeHandler: key => { assert.equal(key, 'ports:list'); removed = true; } },
+    ipcMain: { handle: (key, fn) => { if (key === 'ports:list') handler = fn; }, removeHandler: key => removed.push(key) },
     getPanel: () => panel,
     scan: ({ signal }) => {
       calls++;
@@ -108,7 +108,79 @@ test('ports: IPC checks the panel main frame, shares pending scans, retries, and
   assert.equal(calls, 2);
   service.dispose();
   assert.equal(scanSignal.aborted, true);
-  assert.equal(removed, true);
+  assert.deepEqual(removed, ['ports:list', 'ports:open']);
   assert.equal((await next).ok, false);
   assert.equal(handler(event).ok, false);
+});
+
+
+test('ports: browser URLs use bound IPs, map wildcard to loopback, and validate ports and hosts', () => {
+  const url = (addresses, port = 3000) => getPortUrl({ port, protocol: 'TCP', addresses });
+  const v4 = address => ({ address, family: 'IPv4' });
+  const v6 = address => ({ address, family: 'IPv6' });
+  for (const address of ['*', '0.0.0.0', '127.0.0.1']) assert.equal(url([v4(address)]), 'http://127.0.0.1:3000');
+  for (const address of ['*', '::', '::1']) assert.equal(url([v6(address)]), 'http://[::1]:3000');
+  assert.equal(url([v4('127.0.0.2')]), 'http://127.0.0.2:3000');
+  assert.equal(url([v4('192.168.1.5')]), 'http://192.168.1.5:3000');
+  assert.equal(url([v6('fd00::2')]), 'http://[fd00::2]:3000');
+  assert.equal(url([v6('::1'), v4('*')]), 'http://127.0.0.1:3000');
+  assert.equal(url([v4('192.168.1.5'), v6('::1')]), 'http://[::1]:3000');
+  assert.equal(url([v4('*')], 65535), 'http://127.0.0.1:65535');
+  for (const port of [0, 65536, -1, 1.5, NaN, '3000']) assert.equal(url([v4('*')], port), null);
+  for (const address of ['localhost', 'example.com', '127.0.0.1/path', '127.0.0.1@evil.test', 'file:///tmp/x', '::1']) {
+    assert.equal(url([v4(address)]), null);
+  }
+  assert.equal(url([v6('fe80::1%en0')]), null);
+  assert.equal(url([]), null);
+});
+
+test('ports: opening uses only the latest trusted snapshot, rejects unauthorized requests, and handles retries', async () => {
+  const handlers = new Map();
+  const panel = { isDestroyed: () => false, webContents: { isDestroyed: () => false, mainFrame: {} } };
+  const event = { sender: panel.webContents, senderFrame: panel.webContents.mainFrame };
+  const target = { pid: 123, port: 3000 };
+  let items = parseListeningPorts(node);
+  let scanError = false;
+  const opened = [];
+  let finish;
+  let rejectOpen;
+  const service = createPortService({
+    ipcMain: { handle: (key, fn) => handlers.set(key, fn), removeHandler: key => handlers.delete(key) },
+    getPanel: () => panel,
+    scan: async () => { if (scanError) throw new Error('private diagnostic'); return { items, warning: null }; },
+    openExternal: url => {
+      opened.push(url);
+      return new Promise((resolve, reject) => { finish = resolve; rejectOpen = reject; });
+    },
+  });
+  const list = handlers.get('ports:list');
+  const open = handlers.get('ports:open');
+  assert.equal((await open(event, target)).ok, false, 'must be listed first');
+  const snapshot = await list(event);
+  assert.equal(snapshot.value.items[0].url, 'http://127.0.0.1:3000');
+  for (const sender of [{}, { sender: panel.webContents, senderFrame: {} }]) assert.equal((await open(sender, target)).ok, false);
+  for (const input of [null, 'http://evil.test', {}, { pid: 123, port: '3000' }, { pid: 123, port: 0 }, { pid: 999, port: 3000 }]) {
+    assert.equal((await open(event, input)).ok, false);
+  }
+  assert.deepEqual(opened, []);
+  const pending = open(event, { ...target, url: 'file:///tmp/untrusted' });
+  assert.equal((await open(event, target)).ok, false, 'no duplicate tabs while launch is pending');
+  assert.deepEqual(opened, ['http://127.0.0.1:3000']);
+  finish();
+  assert.deepEqual(await pending, { ok: true, value: { url: 'http://127.0.0.1:3000' } });
+  const failed = open(event, target);
+  rejectOpen(new Error('private system error'));
+  assert.match((await failed).error, /기본 브라우저를 열지 못/);
+  scanError = true;
+  assert.equal((await list(event)).ok, false);
+  const retry = open(event, target);
+  finish();
+  assert.equal((await retry).ok, true, 'failed scans retain the displayed snapshot');
+  scanError = false;
+  items = [];
+  await list(event);
+  assert.equal((await open(event, target)).ok, false, 'removed rows are no longer openable');
+  service.dispose();
+  assert.equal(handlers.size, 0);
+  assert.equal((await open(event, target)).ok, false);
 });

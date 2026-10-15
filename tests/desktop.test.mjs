@@ -1127,3 +1127,73 @@ test('F10: loading, empty lists, partial results, failures and retries preserve 
     assert.equal(await panel.locator('#ports-updated').textContent(), '');
   } finally { await app.close(); }
 });
+
+test('F11: opens a listed port through the default browser, handles pending launches, failures and refreshes', { timeout: 30000 }, async t => {
+  const server = createServer();
+  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
+  const port = server.address().port;
+  t.after(() => { if (server.listening) server.close(); });
+  const app = await launch(await profileFor(t));
+  try {
+    // Intercept only the OS browser launch boundary so tests never open user tabs.
+    await app.evaluate(({ shell }) => {
+      globalThis.openedPortUrls = [];
+      shell.openExternal = url => {
+        globalThis.openedPortUrls.push(url);
+        return new Promise((resolve, reject) => {
+          globalThis.finishPortOpen = resolve;
+          globalThis.failPortOpen = () => reject(new Error('private launch diagnostic'));
+        });
+      };
+    });
+    const { pet, panel } = await openPanel(app);
+    const errors = [];
+    panel.on('pageerror', error => errors.push(error.message));
+    const panelUrl = panel.url();
+    await panel.locator('#show-ports').click();
+    const row = panel.locator(`#port-list li[data-port="${port}"][data-pid="${process.pid}"]`);
+    await row.waitFor();
+    const button = row.getByRole('button', { name: `${port} 포트 브라우저로 열기`, includeHidden: true });
+    const feedback = row.locator('.port-open-status');
+    assert.equal(await row.locator('.port-url').textContent(), `http://127.0.0.1:${port}`);
+    assert.equal((await pet.evaluate(({ pid, port }) => window.ports.open(pid, port), { pid: process.pid, port })).ok, false);
+    assert.deepEqual(await app.evaluate(() => globalThis.openedPortUrls), []);
+    await button.focus();
+    await panel.keyboard.press('Enter');
+    await panel.waitForFunction(() => document.querySelector('.open-port:disabled') !== null);
+    assert.match(await feedback.textContent(), /여는 중/);
+    assert.equal(await button.isDisabled(), true);
+    assert.equal((await panel.evaluate(({ pid, port }) => window.ports.open(pid, port), { pid: process.pid, port })).ok, false);
+    assert.deepEqual(await app.evaluate(() => globalThis.openedPortUrls), [`http://127.0.0.1:${port}`]);
+    await app.evaluate(() => globalThis.failPortOpen());
+    await waitUntil(async () => !(await button.isDisabled()));
+    assert.match(await feedback.textContent(), /기본 브라우저를 열지 못/);
+    assert.doesNotMatch(await feedback.textContent(), /private/);
+    await button.click();
+    await app.evaluate(() => globalThis.finishPortOpen());
+    await waitUntil(async () => !(await button.isDisabled()));
+    assert.match(await feedback.textContent(), /열기를 요청/);
+    assert.equal(await feedback.evaluate(el => el.classList.contains('error')), false);
+    assert.equal(panel.url(), panelUrl, 'the utility panel must not navigate to the server');
+    assert.equal(app.windows().length, 2, 'no embedded browser window');
+    await mkdir(path.join(root, 'test-results'), { recursive: true });
+    await panel.screenshot({ path: `${root}/test-results/f11-open-port.png` });
+
+    await button.click();
+    await panel.locator('#refresh-ports').click();
+    await panel.waitForFunction(() => document.querySelector('#port-list').getAttribute('aria-busy') === 'false');
+    assert.equal(await button.isDisabled(), true, 'refreshed rows retain the launch lock');
+    await panel.locator('#show-food').click();
+    await app.evaluate(() => globalThis.finishPortOpen());
+    await waitUntil(async () => !(await button.isDisabled()));
+    assert.equal(await panel.locator('#draft').evaluate(el => document.activeElement === el), true, 'completion does not steal focus');
+    assert.equal(await feedback.textContent(), '', 'old completion does not label a replacement row');
+    await new Promise(resolve => server.close(resolve));
+    await panel.locator('#show-ports').click();
+    await panel.waitForFunction(() => document.querySelector('#port-list').getAttribute('aria-busy') === 'false');
+    assert.equal(await row.count(), 0);
+    assert.equal((await panel.evaluate(({ pid, port }) => window.ports.open(pid, port), { pid: process.pid, port })).ok, false);
+    assert.equal((await app.evaluate(() => globalThis.openedPortUrls)).length, 3);
+    assert.deepEqual(errors, []);
+  } finally { await app.close(); }
+});

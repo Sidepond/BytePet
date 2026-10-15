@@ -77,27 +77,77 @@ async function listListeningPorts({ execute = executeFile, platform = process.pl
   return { items, warning: partial || stderr.trim() ? '일부 항목을 조회하지 못했을 수 있어요. 새로고침으로 다시 확인해 주세요.' : null };
 }
 
-function createPortService({ ipcMain, getPanel, scan = listListeningPorts }) {
+function getPortUrl(item) {
+  if (!Number.isInteger(item.port) || item.port < 1 || item.port > 65535 || item.protocol !== 'TCP') return null;
+  const candidates = [];
+  for (const { address, family } of item.addresses) {
+    const version = family === 'IPv4' ? 4 : family === 'IPv6' ? 6 : 0;
+    if (!version || (address !== '*' && isIP(address) !== version)) continue;
+    const wildcard = address === '*' || address === '0.0.0.0' || address === '::';
+    const host = wildcard ? (version === 4 ? '127.0.0.1' : '::1') : address;
+    const loopback = host.startsWith('127.') || host === '::1';
+    // Prefer loopback, then IPv4; scoped IPv6 addresses are not browser URL hosts.
+    try {
+      const url = `http://${version === 6 ? `[${host}]` : host}:${item.port}`;
+      new URL(url);
+      candidates.push({ url, rank: (loopback ? 0 : 2) + (version === 4 ? 0 : 1) });
+    } catch { /* No browser-compatible address for this socket. */ }
+  }
+  return candidates.sort((a, b) => a.rank - b.rank)[0]?.url || null;
+}
+
+function createPortService({ ipcMain, getPanel, scan = listListeningPorts, openExternal }) {
   let pending = null;
   let controller = null;
   let disposed = false;
-  ipcMain.handle('ports:list', event => {
+  let snapshot = [];
+  let opening = false;
+  function allowed(event) {
     const panel = getPanel();
-    if (disposed || !panel || panel.isDestroyed() || panel.webContents.isDestroyed()
-      || event.sender !== panel.webContents || event.senderFrame !== panel.webContents.mainFrame) {
-      return { ok: false, error: '허용되지 않은 요청이에요.' };
-    }
+    return !disposed && panel && !panel.isDestroyed() && !panel.webContents.isDestroyed()
+      && event.sender === panel.webContents && event.senderFrame === panel.webContents.mainFrame;
+  }
+  ipcMain.handle('ports:list', event => {
+    if (!allowed(event)) return { ok: false, error: '허용되지 않은 요청이에요.' };
     if (!pending) {
       controller = new AbortController();
       const signal = controller.signal;
       pending = Promise.resolve().then(() => scan({ signal }))
-        .then(value => ({ ok: true, value: { ...value, checkedAt: new Date().toISOString() } }))
+        .then(value => {
+          if (disposed) throw new PortError('포트 조회가 취소됐어요.');
+          snapshot = value.items.map(item => ({ ...item, url: getPortUrl(item) }));
+          return { ok: true, value: { ...value, items: snapshot, checkedAt: new Date().toISOString() } };
+        })
         .catch(error => ({ ok: false, error: error instanceof PortError ? error.message : '포트를 조회하지 못했어요. 다시 시도해 주세요.' }))
         .finally(() => { pending = null; controller = null; });
     }
     return pending;
   });
-  return { dispose() { disposed = true; controller?.abort(); ipcMain.removeHandler('ports:list'); } };
+  ipcMain.handle('ports:open', async (event, target) => {
+    if (!allowed(event)) return { ok: false, error: '허용되지 않은 요청이에요.' };
+    if (!target || !Number.isSafeInteger(target.pid) || target.pid < 1
+      || !Number.isInteger(target.port) || target.port < 1 || target.port > 65535) {
+      return { ok: false, error: '올바른 포트 항목을 선택해 주세요.' };
+    }
+    // Resolve exclusively from the main process snapshot, never a renderer-supplied URL.
+    const item = snapshot.find(item => item.pid === target.pid && item.port === target.port);
+    if (!item?.url) return { ok: false, error: '열 수 있는 주소가 없어요. 목록을 새로고침해 주세요.' };
+    if (opening) return { ok: false, error: '브라우저를 여는 중이에요. 잠시 후 다시 시도해 주세요.' };
+    opening = true;
+    try {
+      await openExternal(item.url);
+      return { ok: true, value: { url: item.url } };
+    } catch {
+      return { ok: false, error: '기본 브라우저를 열지 못했어요. 브라우저 설정을 확인하고 다시 시도해 주세요.' };
+    } finally { opening = false; }
+  });
+  return { dispose() {
+    disposed = true;
+    snapshot = [];
+    controller?.abort();
+    ipcMain.removeHandler('ports:list');
+    ipcMain.removeHandler('ports:open');
+  } };
 }
 
-module.exports = { parseListeningPorts, listListeningPorts, createPortService, PortError };
+module.exports = { parseListeningPorts, listListeningPorts, getPortUrl, createPortService, PortError };

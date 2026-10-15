@@ -7,6 +7,26 @@ export function setupPortsPanel() {
   const button = document.querySelector('#refresh-ports');
   let busy = false;
   let hasSnapshot = false;
+  let opening = false;
+
+  async function openPort(item, feedback) {
+    if (opening) return;
+    opening = true;
+    for (const control of list.querySelectorAll('.open-port')) control.disabled = true;
+    feedback.classList.remove('error');
+    feedback.textContent = '기본 브라우저를 여는 중이에요…';
+    try {
+      const response = await window.ports.open(item.pid, item.port);
+      if (!response.ok) throw new Error(response.error);
+      feedback.textContent = '기본 브라우저에 열기를 요청했어요.';
+    } catch (error) {
+      feedback.classList.add('error');
+      feedback.textContent = error.message || '브라우저를 열지 못했어요. 다시 시도해 주세요.';
+    } finally {
+      opening = false;
+      for (const control of list.querySelectorAll('.open-port')) control.disabled = control.dataset.unavailable === 'true';
+    }
+  }
 
   async function refresh() {
     if (busy) return;
@@ -39,6 +59,26 @@ export function setupPortsPanel() {
         addresses.className = 'port-addresses';
         addresses.textContent = item.addresses.map(({ family, address }) => `${family} ${address}`).join(' · ');
         row.append(heading, meta, addresses);
+        const url = document.createElement('p');
+        url.className = 'port-url';
+        url.textContent = item.url || '브라우저로 열 수 있는 주소가 없어요.';
+        const actions = document.createElement('div');
+        actions.className = 'item-actions';
+        const open = document.createElement('button');
+        open.type = 'button';
+        open.className = 'open-port';
+        open.textContent = '브라우저로 열기';
+        open.setAttribute('aria-label', `${item.port} 포트 브라우저로 열기`);
+        open.title = item.url || '열 수 있는 주소 없음';
+        open.dataset.unavailable = String(!item.url);
+        open.disabled = opening || !item.url;
+        const feedback = document.createElement('p');
+        feedback.className = 'port-open-status';
+        feedback.setAttribute('role', 'status');
+        feedback.setAttribute('aria-live', 'polite');
+        open.addEventListener('click', () => openPort(item, feedback));
+        actions.append(open);
+        row.append(url, actions, feedback);
         list.append(row);
       }
       hasSnapshot = true;

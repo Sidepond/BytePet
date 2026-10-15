@@ -1,4 +1,4 @@
-const { BrowserWindow, ipcMain, screen, clipboard } = require('electron');
+const { BrowserWindow, ipcMain, screen, clipboard, shell } = require('electron');
 const path = require('node:path');
 const { getPanelBounds } = require('./window.cjs');
 const { createFoodService } = require('./food.cjs');
@@ -11,7 +11,7 @@ function createUtilityPanel(pet) {
   let ready = false;
   const food = createFoodService(pet, () => panel);
   const results = createResultService({ ipcMain, clipboard, pet, getPanel: () => panel });
-  const ports = createPortService({ ipcMain, getPanel: () => panel });
+  const ports = createPortService({ ipcMain, getPanel: () => panel, openExternal: url => shell.openExternal(url) });
 
   function publish() {
     // The renderer can be destroyed before the native parent window closes.

@@ -42,6 +42,7 @@ contextBridge.exposeInMainWorld('resultTools', {
 
 contextBridge.exposeInMainWorld('ports', {
   list: () => ipcRenderer.invoke('ports:list'),
+  open: (pid, port) => ipcRenderer.invoke('ports:open', { pid, port }),
 });
 
 contextBridge.exposeInMainWorld('food', {
