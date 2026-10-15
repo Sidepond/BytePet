@@ -35,7 +35,7 @@ function getVisibleBounds(position, workAreas, primaryWorkArea) {
 
 function getPanelBounds(pet, area) {
   const width = Math.min(360, area.width);
-  const height = Math.min(356, area.height);
+  const height = Math.min(560, area.height);
   const gap = 8;
   const candidates = [
     { x: pet.x + (pet.width - width) / 2, y: pet.y - height - gap },

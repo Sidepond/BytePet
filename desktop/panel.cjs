@@ -1,11 +1,13 @@
 const { BrowserWindow, ipcMain, screen } = require('electron');
 const path = require('node:path');
 const { getPanelBounds } = require('./window.cjs');
+const { createFoodService } = require('./food.cjs');
 
 function createUtilityPanel(pet) {
   let panel;
   let open = false;
   let ready = false;
+  const food = createFoodService(pet, () => panel);
 
   function publish() {
     if (!pet.isDestroyed()) pet.webContents.send('pet:panel-state', open);
@@ -36,7 +38,7 @@ function createUtilityPanel(pet) {
       show: false, resizable: false, maximizable: false, minimizable: false,
       fullscreenable: false, alwaysOnTop: true, acceptFirstMouse: true,
       webPreferences: {
-        preload: path.join(__dirname, 'panel-preload.cjs'),
+        preload: path.join(__dirname, 'preload.cjs'),
         contextIsolation: true, nodeIntegration: false, sandbox: true,
       },
     });
@@ -72,6 +74,7 @@ function createUtilityPanel(pet) {
   return {
     reposition,
     dispose() {
+      food.dispose();
       ipcMain.removeListener('pet:panel-toggle', toggle);
       ipcMain.removeListener('panel:close', close);
       if (panel && !panel.isDestroyed()) panel.destroy();

@@ -23,6 +23,17 @@ async function launch(profile) {
 
 const bounds = app => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(win => win.getTitle() === 'BytePet').getBounds());
 
+async function openPanel(app) {
+  const pet = await app.firstWindow();
+  await pet.waitForLoadState('load');
+  const opened = app.waitForEvent('window');
+  await pet.evaluate(() => window.petPanel.toggle());
+  const panel = await opened;
+  await panel.waitForLoadState('load');
+  await panel.waitForFunction(() => document.activeElement?.id === 'draft');
+  return { pet, panel };
+}
+
 async function waitUntil(check) {
   const deadline = Date.now() + 5000;
   while (!(await check())) {
@@ -273,7 +284,7 @@ test('F03: native input switches on visible pixels, follows animation, and stays
         win.testForward = options?.forward;
         return original(ignore, options);
       };
-      win.testCursor = { x: 64, y: 64 };
+      win.testCursor = { x: 4, y: 4 };
       screen.getCursorScreenPoint = () => {
         const { x, y } = win.getContentBounds();
         return { x: x + win.testCursor.x, y: y + win.testCursor.y };
@@ -283,6 +294,10 @@ test('F03: native input switches on visible pixels, follows animation, and stays
     const cursor = point => app.evaluate(({ BrowserWindow }, point) => {
       BrowserWindow.getAllWindows().find(win => win.getTitle() === 'BytePet').testCursor = point;
     }, point);
+    // Force a transition after installing the observer, independent of the real
+    // cursor position when the test window first appeared.
+    await page.waitForTimeout(60);
+    await cursor({ x: 64, y: 64 });
     await waitUntil(async () => await ignoring() === false);
     await cursor({ x: 4, y: 4 });
     await waitUntil(async () => await ignoring() === true);
@@ -433,4 +448,127 @@ test('F04: rapid toggles, panel following, and pet shutdown do not leave an orph
   } finally {
     await app.close();
   }
+});
+
+test('F05: text and original image files persist, and only successful saves trigger eating', { timeout: 30000 }, async t => {
+  const profile = await profileFor(t);
+  let app = await launch(profile);
+  try {
+    let { pet, panel } = await openPanel(app);
+    await pet.emulateMedia({ reducedMotion: 'no-preference' });
+    await panel.locator('#feed-text').click();
+    await panel.waitForFunction(() => document.querySelector('#feed-status').textContent.includes('입력해'));
+    assert.notEqual(await pet.locator('canvas').getAttribute('data-state'), 'eating');
+    const text = '  한글 🐱\n{"hello":"world"}\n';
+    await panel.locator('#draft').fill(text);
+    await panel.locator('#feed-text').click();
+    await panel.waitForFunction(() => document.querySelectorAll('#food-list li').length === 1);
+    await pet.waitForFunction(() => document.querySelector('canvas').dataset.state === 'eating');
+    const frame = await pet.locator('canvas').evaluate(canvas => canvas.toDataURL());
+    await pet.waitForFunction(frame => document.querySelector('canvas').toDataURL() !== frame, frame);
+    await pet.screenshot({ path: `${root}/test-results/f05-eating.png`, omitBackground: true });
+    await waitUntil(async () => await panel.locator('#draft').inputValue() === '');
+
+    const image = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2l9sAAAAASUVORK5CYII=', 'base64');
+    const sources = [path.join(profile, 'a', 'photo.png'), path.join(profile, 'b', 'photo.png')];
+    for (const source of sources) { await mkdir(path.dirname(source)); await writeFile(source, image); }
+    await panel.locator('#files').setInputFiles(sources);
+    await panel.waitForFunction(() => document.querySelectorAll('#food-list li').length === 3);
+    const result = await panel.evaluate(() => window.food.list());
+    assert.equal(result.ok, true);
+    for (const item of result.value.filter(item => item.kind === 'file')) {
+      assert.deepEqual(await readFile(path.join(profile, 'food', item.id, 'content', item.filename)), image);
+    }
+    assert.deepEqual(await readFile(sources[0]), image);
+    await panel.screenshot({ path: `${root}/test-results/f05-panel.png` });
+    await app.close();
+    app = await launch(profile);
+    ({ pet, panel } = await openPanel(app));
+    await panel.waitForFunction(() => document.querySelectorAll('#food-list li').length === 3);
+    await panel.getByRole('button', { name: '텍스트 불러오기' }).click();
+    assert.equal(await panel.locator('#draft').inputValue(), text);
+    assert.notEqual(await pet.locator('canvas').getAttribute('data-state'), 'eating', 'restoring a list does not eat again');
+    // User-initiated file opening resolves only a saved item, without launching an external app in the test.
+    await app.evaluate(({ shell }) => { shell.openPath = async file => { globalThis.openedFood = file; return ''; }; });
+    await panel.getByRole('button', { name: '파일 열기', exact: true }).first().click();
+    await waitUntil(() => app.evaluate(() => typeof globalThis.openedFood === 'string'));
+    assert.ok((await app.evaluate(() => globalThis.openedFood)).startsWith(path.join(profile, 'food') + path.sep));
+  } finally { await app.close(); }
+});
+
+test('F05: pet drops, text paste, clipboard images, and oversize errors use the same shelf', { timeout: 30000 }, async t => {
+  const app = await launch(await profileFor(t));
+  try {
+    const { pet, panel } = await openPanel(app);
+    await pet.emulateMedia({ reducedMotion: 'reduce' });
+    await pet.evaluate(() => {
+      const data = new DataTransfer();
+      data.setData('text/plain', 'dropped on pet');
+      document.body.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, clientX: 64, clientY: 64, dataTransfer: data }));
+    });
+    await panel.waitForFunction(() => document.querySelectorAll('#food-list li').length === 1);
+    await pet.waitForFunction(() => document.querySelector('canvas').dataset.state === 'eating');
+    const still = await pet.locator('canvas').evaluate(canvas => canvas.toDataURL());
+    await pet.waitForTimeout(250);
+    assert.equal(await pet.locator('canvas').evaluate(canvas => canvas.toDataURL()), still, 'reduced motion uses a static success pose');
+    await panel.locator('#close').focus();
+    await panel.evaluate(() => {
+      const data = new DataTransfer();
+      data.setData('text/plain', 'pasted text');
+      document.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+    });
+    assert.equal(await panel.locator('#draft').inputValue(), 'pasted text');
+    await panel.locator('#feed-text').click();
+    await panel.waitForFunction(() => document.querySelectorAll('#food-list li').length === 2);
+    await panel.evaluate(() => {
+      const data = new DataTransfer();
+      data.items.add(new File([new Uint8Array([1, 2, 255, 4])], 'clipboard.png', { type: 'image/png' }));
+      document.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+    });
+    await panel.waitForFunction(() => document.querySelectorAll('#food-list li').length === 3);
+    await pet.waitForFunction(() => document.querySelector('canvas').dataset.state === 'idle');
+    await panel.evaluate(() => {
+      const data = new DataTransfer();
+      data.items.add(new File([new Uint8Array(25 * 1024 * 1024 + 1)], 'too-large.png'));
+      document.body.dispatchEvent(new DragEvent('drop', { dataTransfer: data, bubbles: true, cancelable: true }));
+    });
+    await panel.waitForFunction(() => document.querySelector('#feed-status').textContent.includes('25MB'));
+    assert.equal(await panel.locator('#food-list li').count(), 3);
+    assert.equal(await pet.locator('canvas').getAttribute('data-state'), 'idle');
+    const rejected = await panel.evaluate(() => window.food.saveText('한'.repeat(400000)));
+    assert.equal(rejected.ok, false);
+    assert.match(rejected.error, /1MB/);
+    assert.equal(await panel.locator('#food-list li').count(), 3);
+  } finally { await app.close(); }
+});
+
+test('F05: partial file batches preserve successes; storage failures retain unsaved text', { timeout: 30000 }, async t => {
+  const profile = await profileFor(t);
+  let app = await launch(profile);
+  try {
+    let { pet, panel } = await openPanel(app);
+    const mixed = await panel.evaluate(() => window.food.saveFiles([
+      new File(['keep this file'], 'good.txt'),
+      new File([new Uint8Array(25 * 1024 * 1024 + 1)], 'large.bin'),
+    ]));
+    assert.equal(mixed.ok, true);
+    assert.equal(mixed.value.items.length, 1);
+    assert.equal(mixed.value.errors.length, 1);
+    assert.match(mixed.value.errors[0], /large.bin.*25MB/);
+    assert.equal((await panel.evaluate(() => window.food.list())).value.length, 1);
+    const tooMany = await panel.evaluate(() => window.food.saveFiles(Array.from({ length: 11 }, () => new File(['x'], 'x.txt'))));
+    assert.equal(tooMany.ok, false);
+    await app.close();
+    // Use a separate profile whose storage root is a file, simulating an I/O failure.
+    const blocked = await profileFor(t);
+    await writeFile(path.join(blocked, 'food'), 'do not overwrite');
+    app = await launch(blocked);
+    ({ pet, panel } = await openPanel(app));
+    await panel.locator('#draft').fill('keep my unsaved input');
+    await panel.locator('#feed-text').click();
+    await panel.waitForFunction(() => !document.querySelector('#feed-text').disabled && document.querySelector('#feed-status').classList.contains('error'));
+    assert.equal(await panel.locator('#draft').inputValue(), 'keep my unsaved input');
+    assert.notEqual(await pet.locator('canvas').getAttribute('data-state'), 'eating');
+    assert.equal(await readFile(path.join(blocked, 'food'), 'utf8'), 'do not overwrite');
+  } finally { await app.close(); }
 });

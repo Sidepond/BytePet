@@ -14,8 +14,22 @@ textarea { display: block; width: 100%; height: 88px; resize: none; padding: 10p
 textarea::placeholder { color: #867566; }
 :focus-visible { outline: 2px solid #459b8f; outline-offset: 2px; }
 #draft-hint { margin: 7px 0 16px; font-size: 11px; color: #78685c; }
-.tools { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.tools button { padding: 10px 2px; border: 1px solid #e7d9c6; border-radius: 8px; background: #f5efe4; color: #766354; font-size: 12px; font-weight: 600; }
-.tools span { display: block; margin-top: 5px; font-size: 10px; font-weight: 400; }
 footer { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 17px; color: #78685c; font-size: 10px; }
 kbd { border: 1px solid #dfd3c2; border-radius: 4px; padding: 2px 4px; background: #fffefb; }
+.feed-actions { display: flex; gap: 8px; }
+.feed-actions button, .shelf-header button, .item-actions button { border: 1px solid #d8c6ac; border-radius: 6px; padding: 7px 10px; background: #fffefb; color: #53382f; font-size: 12px; cursor: pointer; }
+#feed-text { background: #53382f; border-color: #53382f; color: #fffaf0; font-weight: 700; }
+button:disabled { cursor: default; opacity: .6; }
+#feed-status { min-height: 32px; margin: 10px 0; font-size: 12px; line-height: 1.5; color: #347b70; overflow-wrap: anywhere; }
+#feed-status.error { color: #a02d21; }
+.shelf-header { display: flex; align-items: center; justify-content: space-between; }
+h2 { font-size: 13px; margin: 0; }
+.shelf-header button { border: 0; padding-right: 0; background: transparent; font-size: 11px; }
+#food-list { list-style: none; padding: 0; margin: 8px 0 14px; max-height: 150px; overflow-y: auto; }
+#food-list li { padding: 9px 0; border-bottom: 1px solid #e7d9c6; }
+.item-name { display: block; font-size: 12px; font-weight: 600; overflow-wrap: anywhere; }
+.item-meta { color: #78685c; font-size: 10px; margin: 5px 0; }
+.item-actions { display: flex; gap: 6px; }
+.item-actions button { padding: 4px 7px; font-size: 10px; }
+#empty-shelf { font-size: 12px; color: #78685c; padding: 14px 0; }
+body.food-over main { box-shadow: inset 0 0 0 3px #459b8f; }

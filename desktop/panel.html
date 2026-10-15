@@ -10,18 +10,24 @@
   <body>
     <main role="dialog" aria-modal="false" aria-labelledby="panel-title">
       <header>
-        <div><p class="brand">BYTEPET <span>●</span></p><h1 id="panel-title">작은 작업 공간</h1></div>
+        <div><p class="brand">BYTEPET <span>●</span></p><h1 id="panel-title">오늘의 먹이</h1></div>
         <button id="close" type="button" aria-label="패널 닫기" title="닫기 (Esc)">×</button>
       </header>
-      <label for="draft">작업 메모</label>
-      <textarea id="draft" spellcheck="false" placeholder="생각이나 텍스트를 잠시 적어두세요." aria-describedby="draft-hint"></textarea>
-      <p id="draft-hint">메모는 앱을 종료하면 지워집니다.</p>
-      <div class="tools" aria-label="준비 중인 유틸리티">
-        <button type="button" disabled>JWT 해독<span>준비 중</span></button>
-        <button type="button" disabled>JSON 정리<span>준비 중</span></button>
-        <button type="button" disabled>포트 확인<span>준비 중</span></button>
+      <label for="draft">텍스트 먹이</label>
+      <textarea id="draft" spellcheck="false" placeholder="텍스트를 붙여넣거나, 파일·사진을 여기로 드롭하세요." aria-describedby="draft-hint"></textarea>
+      <p id="draft-hint">텍스트 1MB · 파일당 25MB · 한 번에 10개</p>
+      <div class="feed-actions">
+        <button id="feed-text" type="button">먹이 주기</button>
+        <button id="choose-files" type="button">파일·사진 선택</button>
+        <input id="files" type="file" multiple hidden>
       </div>
-      <footer>고양이를 다시 클릭해도 닫을 수 있어요.<kbd>Esc</kbd></footer>
+      <p id="feed-status" role="status" aria-live="polite">먹인 내용은 이 컴퓨터에 저장됩니다.</p>
+      <section aria-labelledby="shelf-title">
+        <div class="shelf-header"><h2 id="shelf-title">보관함</h2><button id="open-folder" type="button">폴더 열기</button></div>
+        <ul id="food-list" aria-label="저장된 먹이"></ul>
+        <p id="empty-shelf">아직 먹이가 없어요. 첫 먹이를 주세요!</p>
+      </section>
+      <footer>JWT·JSON 변환, 포트 확인은 준비 중<kbd>Esc 닫기</kbd></footer>
     </main>
     <script type="module" src="panel.js"></script>
   </body>

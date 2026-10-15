@@ -1,5 +1,6 @@
 export const SIZE = 24;
 export const CYCLE_MS = 4800;
+export const EATING_MS = 1800;
 
 const palette = {
   o: '#53382f',
@@ -94,4 +95,34 @@ export function drawCat(ctx, elapsed) {
   ctx.fillRect(8, 14, 9, 1);
   ctx.fillStyle = '#ffe293';
   ctx.fillRect(12, 15, 2, 2);
+}
+
+export function drawEatingCat(ctx, elapsed) {
+  drawCat(ctx, 0);
+  const chewing = elapsed >= 400 && elapsed < 1350;
+  const mouthHeight = chewing ? 1 + Math.floor(elapsed / 150) % 2 : 1;
+  // Cover the idle mouth, then chew with lifted paws and pink cheeks.
+  ctx.fillStyle = palette.c;
+  ctx.fillRect(10, 12, 5, 2);
+  ctx.fillStyle = palette.o;
+  ctx.fillRect(11, 12, 3, mouthHeight);
+  ctx.fillStyle = palette.p;
+  ctx.fillRect(7, 11, 2, 1);
+  ctx.fillRect(16, 11, 2, 1);
+  if (elapsed < 1350) {
+    ctx.fillStyle = palette.l;
+    ctx.fillRect(9, 14, 2, 2);
+    ctx.fillRect(14, 14, 2, 2);
+    ctx.fillStyle = '#459b8f';
+    const x = elapsed < 400 ? 18 - Math.floor(elapsed / 80) : 12;
+    ctx.fillRect(x, 13, chewing ? 1 : 3, 2);
+  } else {
+    // A small heart marks successful feeding before returning to idle.
+    ctx.fillStyle = palette.p;
+    paintRows(ctx, ['p.p', 'ppp', '.p.'], 19, 3);
+    ctx.fillStyle = palette.o;
+    ctx.fillRect(11, 12, 1, 1);
+    ctx.fillRect(13, 12, 1, 1);
+    ctx.fillRect(12, 13, 1, 1);
+  }
 }

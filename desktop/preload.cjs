@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 // Only pet input is exposed; the renderer cannot read or write files.
 contextBridge.exposeInMainWorld('petDrag', {
@@ -18,5 +18,43 @@ contextBridge.exposeInMainWorld('petPanel', {
     const listener = (_event, open) => callback(open);
     ipcRenderer.on('pet:panel-state', listener);
     return () => ipcRenderer.removeListener('pet:panel-state', listener);
+  },
+});
+
+contextBridge.exposeInMainWorld('utilityPanel', {
+  close: () => ipcRenderer.send('panel:close'),
+  onOpen: callback => {
+    const listener = () => callback();
+    ipcRenderer.on('panel:opened', listener);
+    return () => ipcRenderer.removeListener('panel:opened', listener);
+  },
+});
+
+contextBridge.exposeInMainWorld('food', {
+  saveText: text => ipcRenderer.invoke('food:save-text', text),
+  async saveFiles(files) {
+    if (!Array.isArray(files) || files.length > 10) return { ok: false, error: '파일은 한 번에 10개까지 먹일 수 있어요.' };
+    try {
+      const sources = [];
+      for (const file of files) {
+        const source = { name: file.name };
+        const filePath = webUtils.getPathForFile(file);
+        if (file.size > 25 * 1024 * 1024) source.oversized = true;
+        else if (filePath) source.path = filePath;
+        else source.bytes = new Uint8Array(await file.arrayBuffer());
+        sources.push(source);
+      }
+      return ipcRenderer.invoke('food:save-files', sources);
+    } catch { return { ok: false, error: '파일을 읽을 수 없어요. 다시 선택해 주세요.' }; }
+  },
+  list: () => ipcRenderer.invoke('food:list'),
+  readText: id => ipcRenderer.invoke('food:read-text', id),
+  open: id => ipcRenderer.invoke('food:open', id),
+  reveal: id => ipcRenderer.invoke('food:reveal', id),
+  folder: () => ipcRenderer.invoke('food:folder'),
+  onSaved: callback => {
+    const listener = (_event, result) => callback(result);
+    ipcRenderer.on('food:saved', listener);
+    return () => ipcRenderer.removeListener('food:saved', listener);
   },
 });
