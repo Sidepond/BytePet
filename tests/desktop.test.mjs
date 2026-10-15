@@ -255,3 +255,87 @@ test('F02: right-button gestures and lost capture do not leave a stuck drag', { 
     await app.close();
   }
 });
+
+test('F03: native input switches on visible pixels, follows animation, and stays held during drag', { timeout: 30000 }, async t => {
+  const app = await launch(await profileFor(t));
+  try {
+    const page = await app.firstWindow();
+    await page.waitForLoadState('load');
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    // CDP mouse events bypass OS routing. Observe actual native API calls here;
+    // a separate desktop check verifies clicks reaching the window underneath.
+    await app.evaluate(({ BrowserWindow, screen }) => {
+      const win = BrowserWindow.getAllWindows()[0];
+      const original = win.setIgnoreMouseEvents.bind(win);
+      win.setIgnoreMouseEvents = (ignore, options) => {
+        win.testIgnoring = ignore;
+        win.testForward = options?.forward;
+        return original(ignore, options);
+      };
+      win.testCursor = { x: 64, y: 64 };
+      screen.getCursorScreenPoint = () => {
+        const { x, y } = win.getContentBounds();
+        return { x: x + win.testCursor.x, y: y + win.testCursor.y };
+      };
+    });
+    const ignoring = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].testIgnoring);
+    const cursor = point => app.evaluate(({ BrowserWindow }, point) => {
+      BrowserWindow.getAllWindows()[0].testCursor = point;
+    }, point);
+    await waitUntil(async () => await ignoring() === false);
+    await cursor({ x: 4, y: 4 });
+    await waitUntil(async () => await ignoring() === true);
+    assert.equal(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].testForward), true);
+    await cursor({ x: 20, y: 20 }); // Transparent pixel inside the canvas.
+    await page.mouse.move(20, 20);
+    const before = await bounds(app);
+    await page.mouse.down();
+    await page.mouse.move(40, 40);
+    await page.mouse.up();
+    assert.deepEqual(await bounds(app), before);
+    assert.equal(await ignoring(), true);
+
+    await cursor({ x: 64, y: 64 });
+    await waitUntil(async () => await ignoring() === false);
+    await page.mouse.move(64, 64);
+    await page.mouse.down();
+    await cursor({ x: 4, y: 4 });
+    await page.mouse.move(8, 8);
+    await waitUntil(async () => (await bounds(app)).x < before.x);
+    assert.equal(await ignoring(), false, 'drag owns input even over transparent pixels');
+    await page.mouse.up();
+    await waitUntil(async () => await ignoring() === true);
+
+    // The ear moves under a stationary cursor. No mouse event is sent here.
+    await cursor({ x: 38, y: 26 });
+    assert.equal(await ignoring(), true);
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await waitUntil(async () => await ignoring() === false);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await waitUntil(async () => await ignoring() === true);
+    // Re-entering after click-through must re-enable interaction.
+    await cursor({ x: 64, y: 64 });
+    await waitUntil(async () => await ignoring() === false);
+    await page.reload();
+    await page.waitForLoadState('load');
+    await waitUntil(async () => await ignoring() === false);
+
+    // Keep a menu interaction pinned until Electron's close callback fires.
+    await app.evaluate(({ BrowserWindow, Menu }) => {
+      const win = BrowserWindow.getAllWindows()[0];
+      Menu.prototype.popup = options => { win.testMenu = options; };
+      win.webContents.emit('context-menu', {}, { x: 20, y: 20 });
+      if (win.testMenu) throw new Error('Transparent pixels opened the pet menu');
+      win.webContents.emit('context-menu', {}, { x: 64, y: 64 });
+      if (!win.testMenu) throw new Error('Visible pixels did not open the pet menu');
+    });
+    await cursor({ x: 4, y: 4 });
+    // Allow at least one native cursor poll with the menu held open.
+    await page.waitForTimeout(60);
+    assert.equal(await ignoring(), false);
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].testMenu.callback());
+    await waitUntil(async () => await ignoring() === true);
+  } finally {
+    await app.close();
+  }
+});

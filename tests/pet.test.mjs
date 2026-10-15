@@ -6,6 +6,7 @@ import path from 'node:path';
 import { getInitialBounds, getVisibleBounds } from '../desktop/window.cjs';
 import { createPositionStore } from '../desktop/position-store.cjs';
 import { getIdlePose, CYCLE_MS } from '../desktop/cat.js';
+import { isHitRegion, hitsRegion } from '../desktop/input.cjs';
 
 test('initial placement respects work area origin and dock reservation', () => {
   assert.deepEqual(getInitialBounds({ x: -1920, y: 30, width: 1920, height: 1000 }), {
@@ -87,4 +88,25 @@ test('a storage failure does not throw or prevent the pet from running', t => {
   assert.equal(store.write({ x: 100, y: 100 }), false);
   assert.equal(readFileSync(blocker, 'utf8'), 'keep');
   assert.equal(warnings.length, 2);
+});
+
+const hitRegion = { x: 16, y: 16, width: 96, height: 96, columns: 2, rows: 2, alpha: [0, 255, 36, 0] };
+
+test('pixel hit testing includes visible pixels and excludes transparent holes and outside edges', () => {
+  assert.equal(isHitRegion(hitRegion), true);
+  for (const point of [{ x: 16, y: 16 }, { x: 15.99, y: 80 }, { x: 80, y: 112 }, { x: 112, y: 30 }, { x: 80, y: 80 }]) {
+    assert.equal(hitsRegion(hitRegion, point), false);
+  }
+  assert.equal(hitsRegion(hitRegion, { x: 64, y: 16 }), true);
+  assert.equal(hitsRegion(hitRegion, { x: 16, y: 64 }), true, 'partially transparent visible pixels also receive input');
+  assert.equal(hitsRegion(hitRegion, { x: NaN, y: 16 }), false);
+  assert.equal(hitsRegion(null, { x: 80, y: 16 }), false);
+});
+
+test('invalid or oversized hit regions from the renderer are rejected', () => {
+  for (const region of [null, {}, { ...hitRegion, width: Infinity }, { ...hitRegion, x: -1 },
+    { ...hitRegion, width: 200 }, { ...hitRegion, columns: 1.5 }, { ...hitRegion, rows: 0 },
+    { ...hitRegion, alpha: [0, 255] }, { ...hitRegion, alpha: [0, 255, -1, 0] }]) {
+    assert.equal(isHitRegion(region), false);
+  }
 });

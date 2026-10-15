@@ -2,6 +2,7 @@ const { app, BrowserWindow, Menu, screen, ipcMain } = require('electron');
 const path = require('node:path');
 const { getVisibleBounds, isPosition } = require('./window.cjs');
 const { createPositionStore } = require('./position-store.cjs');
+const { createPetInput } = require('./input.cjs');
 
 app.setName('BytePet');
 let petWindow;
@@ -30,6 +31,7 @@ function createPetWindow() {
     },
   });
   petWindow = win;
+  const input = createPetInput(win, screen);
   win.setAlwaysOnTop(true, 'floating');
   win.once('ready-to-show', () => win.showInactive());
   let drag;
@@ -51,17 +53,32 @@ function createPetWindow() {
       if (drag) {
         drag = null;
         keepVisible();
+        input.hold('drag', false);
       }
       return;
     }
     if (!isPosition(point)) return;
-    if (action === 'start' && !drag) drag = { pointer: point, origin: win.getBounds() };
+    if (action === 'start' && !drag) {
+      drag = { pointer: point, origin: win.getBounds() };
+      input.hold('drag', true);
+    }
     if (action === 'move' && drag) {
       const target = { x: drag.origin.x + point.x - drag.pointer.x, y: drag.origin.y + point.y - drag.pointer.y };
       if (isPosition(target)) win.setPosition(target.x, target.y);
     }
   }
   ipcMain.on('pet:drag', handleDrag);
+  function handleHitRegion(event, region) {
+    if (event.sender !== win.webContents || event.senderFrame !== win.webContents.mainFrame) return;
+    input.update(region);
+  }
+  ipcMain.on('pet:hit-region', handleHitRegion);
+  function resetInput() {
+    drag = null;
+    input.reset();
+  }
+  win.webContents.on('did-start-loading', resetInput);
+  win.webContents.on('render-process-gone', resetInput);
   win.on('move', () => {
     clearTimeout(saveTimer);
     // Avoid disk writes for every pointer update; close also flushes immediately.
@@ -73,16 +90,23 @@ function createPetWindow() {
   win.on('closed', () => {
     clearTimeout(saveTimer);
     ipcMain.removeListener('pet:drag', handleDrag);
+    ipcMain.removeListener('pet:hit-region', handleHitRegion);
+    input.dispose();
     for (const event of displayEvents) screen.removeListener(event, keepVisible);
     petWindow = null;
   });
 
-  // The renderer has only a narrow drag bridge and never opens external content.
+  // The renderer has only narrow pet input bridges and never opens external content.
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.webContents.on('will-navigate', event => event.preventDefault());
   win.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
-  win.webContents.on('context-menu', () => {
-    Menu.buildFromTemplate([{ label: 'BytePet 종료', role: 'quit' }]).popup({ window: win });
+  win.webContents.on('context-menu', (_event, params) => {
+    if (!input.hits(params)) return;
+    input.hold('menu', true);
+    Menu.buildFromTemplate([{ label: 'BytePet 종료', role: 'quit' }]).popup({
+      window: win,
+      callback: () => input.hold('menu', false),
+    });
   });
   win.loadFile(path.join(__dirname, 'pet.html')).catch(error => {
     console.error('Could not load BytePet:', error);
