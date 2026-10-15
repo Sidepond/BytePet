@@ -11,7 +11,7 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron .",
-    "test": "node --test tests/pet.test.mjs tests/food.test.mjs tests/jwt.test.mjs tests/json.test.mjs tests/format.test.mjs tests/results.test.mjs tests/ports.test.mjs tests/terminate.test.mjs tests/modules.test.mjs",
+    "test": "node --test tests/pet.test.mjs tests/food.test.mjs tests/jwt.test.mjs tests/json.test.mjs tests/format.test.mjs tests/results.test.mjs tests/ports.test.mjs tests/terminate.test.mjs tests/modules.test.mjs tests/appearance.test.mjs",
     "test:desktop": "node --test tests/desktop.test.mjs"
   },
   "devDependencies": {

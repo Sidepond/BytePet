@@ -46,6 +46,19 @@ async function waitUntil(check) {
   }
 }
 
+async function petPoint(page, x, y) {
+  const rect = await page.locator('#pet').boundingBox();
+  return { x: rect.x + x - 16, y: rect.y + y - 16 };
+}
+async function movePet(page, x, y) {
+  const point = await petPoint(page, x, y);
+  await page.mouse.move(point.x, point.y);
+}
+async function clickPet(page, x, y) {
+  const point = await petPoint(page, x, y);
+  await page.mouse.click(point.x, point.y);
+}
+
 async function runTool(panel, format) {
   await panel.locator('#input-format').selectOption(format);
   await panel.locator('#run-tool').click();
@@ -86,11 +99,11 @@ test('F01: native transparent pet, idle playback, reduced motion, and clean exit
     assert.equal(native.background, '#000000');
     assert.equal(native.cornerAlpha, 0);
     assert.deepEqual(native.bounds, native.content, 'no native title bar or frame');
-    assert.equal(native.bounds.width, 128);
+    assert.equal(native.bounds.width, 496);
     assert.equal(native.bounds.height, 128);
     assert.ok(native.bounds.x >= native.workArea.x);
     assert.ok(native.bounds.y >= native.workArea.y);
-    assert.ok(native.bounds.x + 128 <= native.workArea.x + native.workArea.width);
+    assert.ok(native.bounds.x + native.bounds.width <= native.workArea.x + native.workArea.width);
     assert.ok(native.bounds.y + 128 <= native.workArea.y + native.workArea.height);
     assert.equal(native.preferences.nodeIntegration, false);
     assert.equal(native.preferences.contextIsolation, true);
@@ -151,25 +164,26 @@ test('F02: pointer drag saves position and restores it after restarting', { time
   try {
     const page = await app.firstWindow();
     await page.waitForLoadState('load');
+    await page.emulateMedia({ reducedMotion: 'reduce' });
     assert.equal(await app.evaluate(({ app }) => app.getPath('userData')), profile);
     const before = await bounds(app);
     // A click or a small hand tremor must not become a drag.
-    await page.mouse.move(64, 64);
+    await movePet(page, 64, 64);
     await page.mouse.down();
-    await page.mouse.move(65, 65);
+    await movePet(page, 65, 65);
     await page.mouse.up();
     assert.deepEqual(await bounds(app), before);
     await page.evaluate(() => window.petPanel.close());
     // The transparent margin is not a drag handle.
-    await page.mouse.move(4, 4);
+    await movePet(page, 4, 4);
     await page.mouse.down();
-    await page.mouse.move(10, 10);
+    await movePet(page, 10, 10);
     await page.mouse.up();
     assert.deepEqual(await bounds(app), before);
 
-    await page.mouse.move(64, 64);
+    await movePet(page, 64, 64);
     await page.mouse.down();
-    await page.mouse.move(24, 24);
+    await movePet(page, 24, 24);
     await waitUntil(async () => (await bounds(app)).x < before.x);
     await page.mouse.up();
     await page.waitForFunction(() => !document.querySelector('canvas').classList.contains('dragging'));
@@ -214,7 +228,7 @@ test('F02: corrupt saved state falls back, display changes recover visibility, c
         screen.getAllDisplays = original;
       }
     });
-    assert.ok(recovered.x >= area.x + 20 && recovered.x + 128 <= area.x + 320);
+    assert.ok(recovered.x >= area.x + 20 && recovered.x + recovered.width <= area.x + 320);
     assert.ok(recovered.y >= area.y + 20 && recovered.y + 128 <= area.y + 320);
     const final = { x: area.x + 70, y: area.y + 80 };
     const exited = app.waitForEvent('close');
@@ -231,7 +245,7 @@ test('F02: corrupt saved state falls back, display changes recover visibility, c
     await app.firstWindow();
     const restored = await bounds(app);
     const areas = await app.evaluate(({ screen }) => screen.getAllDisplays().map(display => display.workArea));
-    assert.ok(areas.some(a => restored.x >= a.x && restored.y >= a.y && restored.x + 128 <= a.x + a.width && restored.y + 128 <= a.y + a.height));
+    assert.ok(areas.some(a => restored.x >= a.x && restored.y >= a.y && restored.x + restored.width <= a.x + a.width && restored.y + 128 <= a.y + a.height));
   } finally {
     await app.close();
   }
@@ -242,34 +256,35 @@ test('F02: right-button gestures and lost capture do not leave a stuck drag', { 
   try {
     const page = await app.firstWindow();
     await page.waitForLoadState('load');
+    await page.emulateMedia({ reducedMotion: 'reduce' });
     const before = await bounds(app);
     // Keep the OS menu out of this gesture test; F01 retains the quit menu.
     await page.evaluate(() => document.addEventListener('contextmenu', event => event.preventDefault()));
-    await page.mouse.move(64, 64);
+    await movePet(page, 64, 64);
     await page.mouse.down({ button: 'right' });
-    await page.mouse.move(24, 24);
+    await movePet(page, 24, 24);
     await page.mouse.up({ button: 'right' });
     assert.deepEqual(await bounds(app), before);
 
     await page.evaluate(() => document.querySelector('canvas').addEventListener('gotpointercapture', event => {
       window.capturedPointer = event.pointerId;
     }));
-    await page.mouse.move(64, 64);
+    await movePet(page, 64, 64);
     await page.mouse.down();
     // Travel outside the canvas: pointer capture must still move the pet.
-    await page.mouse.move(8, 8);
+    await movePet(page, 8, 8);
     await waitUntil(async () => (await bounds(app)).x < before.x);
     await page.evaluate(() => document.querySelector('canvas').releasePointerCapture(window.capturedPointer));
-    await page.mouse.move(10, 10);
+    await movePet(page, 10, 10);
     await page.waitForFunction(() => !document.querySelector('canvas').classList.contains('dragging'));
     const stopped = await bounds(app);
-    await page.mouse.move(12, 12);
+    await movePet(page, 12, 12);
     await page.mouse.up();
     assert.deepEqual(await bounds(app), stopped);
     // A new gesture still works after cancellation.
-    await page.mouse.move(64, 64);
+    await movePet(page, 64, 64);
     await page.mouse.down();
-    await page.mouse.move(40, 40);
+    await movePet(page, 40, 40);
     await waitUntil(async () => (await bounds(app)).x < stopped.x);
     await page.mouse.up();
   } finally {
@@ -300,9 +315,9 @@ test('F03: native input switches on visible pixels, follows animation, and stays
       };
     });
     const ignoring = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(win => win.getTitle() === 'BytePet').testIgnoring);
-    const cursor = point => app.evaluate(({ BrowserWindow }, point) => {
+    const cursor = async point => app.evaluate(({ BrowserWindow }, point) => {
       BrowserWindow.getAllWindows().find(win => win.getTitle() === 'BytePet').testCursor = point;
-    }, point);
+    }, await petPoint(page, point.x, point.y));
     // Force a transition after installing the observer, independent of the real
     // cursor position when the test window first appeared.
     await page.waitForTimeout(60);
@@ -312,25 +327,26 @@ test('F03: native input switches on visible pixels, follows animation, and stays
     await waitUntil(async () => await ignoring() === true);
     assert.equal(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(win => win.getTitle() === 'BytePet').testForward), true);
     await cursor({ x: 20, y: 20 }); // Transparent pixel inside the canvas.
-    await page.mouse.move(20, 20);
+    await movePet(page, 20, 20);
     const before = await bounds(app);
     await page.mouse.down();
-    await page.mouse.move(40, 40);
+    await movePet(page, 40, 40);
     await page.mouse.up();
     assert.deepEqual(await bounds(app), before);
     assert.equal(await ignoring(), true);
 
     await cursor({ x: 64, y: 64 });
     await waitUntil(async () => await ignoring() === false);
-    await page.mouse.move(64, 64);
+    await movePet(page, 64, 64);
     await page.mouse.down();
     await cursor({ x: 4, y: 4 });
-    await page.mouse.move(8, 8);
+    await movePet(page, 8, 8);
     await waitUntil(async () => (await bounds(app)).x < before.x);
     assert.equal(await ignoring(), false, 'drag owns input even over transparent pixels');
     await page.mouse.up();
     await waitUntil(async () => await ignoring() === true);
 
+    await movePet(page, 64, 64); // Hover holds roaming while testing the idle sprite's alpha.
     // The ear moves under a stationary cursor. No mouse event is sent here.
     await cursor({ x: 38, y: 26 });
     assert.equal(await ignoring(), true);
@@ -349,9 +365,9 @@ test('F03: native input switches on visible pixels, follows animation, and stays
     await app.evaluate(({ BrowserWindow, Menu }) => {
       const win = BrowserWindow.getAllWindows().find(win => win.getTitle() === 'BytePet');
       Menu.prototype.popup = options => { win.testMenu = options; };
-      win.webContents.emit('context-menu', {}, { x: 20, y: 20 });
+      win.webContents.emit('context-menu', {}, { x: win.getBounds().width - 128 + 20, y: 20 });
       if (win.testMenu) throw new Error('Transparent pixels opened the pet menu');
-      win.webContents.emit('context-menu', {}, { x: 64, y: 64 });
+      win.webContents.emit('context-menu', {}, { x: win.getBounds().width - 128 + 64, y: 64 });
       if (!win.testMenu) throw new Error('Visible pixels did not open the pet menu');
     });
     await cursor({ x: 4, y: 4 });
@@ -370,16 +386,17 @@ test('F04: pet click toggles a focused panel, text survives hiding, and drag nev
   try {
     const pet = await app.firstWindow();
     await pet.waitForLoadState('load');
+    await pet.emulateMedia({ reducedMotion: 'reduce' });
     const panelVisible = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().some(win => win.getTitle() === 'BytePet 유틸리티' && win.isVisible()));
-    await pet.mouse.click(20, 20);
+    await clickPet(pet, 20, 20);
     assert.equal(await panelVisible(), false, 'transparent pixels cannot open a panel');
-    await pet.mouse.move(64, 64);
+    await movePet(pet, 64, 64);
     await pet.mouse.down();
-    await pet.mouse.move(40, 40);
+    await movePet(pet, 40, 40);
     await pet.mouse.up();
     assert.equal(await panelVisible(), false, 'drag cannot open a panel');
     const opened = app.waitForEvent('window');
-    await pet.mouse.click(64, 64);
+    await clickPet(pet, 64, 64);
     const panel = await opened;
     await panel.waitForLoadState('load');
     await waitUntil(panelVisible);
@@ -403,10 +420,10 @@ test('F04: pet click toggles a focused panel, text survives hiding, and drag nev
     assert.ok(safety.bounds.y + safety.bounds.height <= safety.area.y + safety.area.height);
     await panel.screenshot({ path: `${root}/test-results/f04-panel.png` });
 
-    await pet.mouse.click(64, 64);
+    await clickPet(pet, 64, 64);
     await waitUntil(async () => !(await panelVisible()));
     await pet.waitForFunction(() => document.querySelector('canvas').getAttribute('aria-expanded') === 'false');
-    await pet.mouse.click(64, 64);
+    await clickPet(pet, 64, 64);
     await waitUntil(panelVisible);
     await panel.waitForFunction(() => document.activeElement?.id === 'draft');
     assert.equal(await panel.locator('#draft').inputValue(), 'F04 focus check');
@@ -447,8 +464,8 @@ test('F04: rapid toggles, panel following, and pet shutdown do not leave an orph
     });
     await waitUntil(async () => {
       const result = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(win => win.getTitle() === 'BytePet 유틸리티').getBounds());
-      const petX = placement.x + 40, petY = placement.y + 40;
-      const beside = result.x === petX + 128 + 8 || result.y === petY + 128 + 8;
+      const yard = await bounds(app);
+      const beside = result.x === yard.x && result.y + result.height - 10 === yard.y + yard.height - 20;
       return beside && result.x >= placement.x && result.y >= placement.y &&
         result.x + result.width <= placement.x + placement.width && result.y + result.height <= placement.y + placement.height;
     });
@@ -519,7 +536,8 @@ test('F05: pet drops, text paste, clipboard images, and oversize errors use the 
     await pet.evaluate(() => {
       const data = new DataTransfer();
       data.setData('text/plain', 'dropped on pet');
-      document.body.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, clientX: 64, clientY: 64, dataTransfer: data }));
+      const rect = document.querySelector('#pet').getBoundingClientRect();
+      document.body.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, clientX: rect.x + 48, clientY: rect.y + 48, dataTransfer: data }));
     });
     await panel.waitForFunction(() => document.querySelectorAll('#food-list li').length === 1);
     await pet.waitForFunction(() => document.querySelector('canvas').dataset.state === 'eating');
@@ -1505,5 +1523,152 @@ test('F13: disabling ports aborts a pending confirmation and ignores stale list 
     assert.equal(await pet.locator('#pet-message').isVisible(), true, 'M01 does not clear an M02 message');
     await setModule(panel, 'm02', false);
     await pet.waitForFunction(() => document.querySelector('#pet-message').hidden);
+  } finally { await app.close(); }
+});
+
+test('Panel: compact views resize within the display, preserve drafts, and keep navigation reachable', { timeout: 30000 }, async t => {
+  const app = await launch(await profileFor(t));
+  try {
+    const { pet, panel } = await openPanel(app);
+    const panelBounds = () => app.evaluate(({ BrowserWindow, screen }) => {
+      const win = BrowserWindow.getAllWindows().find(win => win.getTitle() === 'BytePet 유틸리티');
+      return { bounds: win.getBounds(), area: screen.getDisplayMatching(win.getBounds()).workArea };
+    });
+    async function expectHeight(height) {
+      await waitUntil(async () => {
+        const { bounds, area } = await panelBounds();
+        return bounds.height === Math.min(height, area.height - 10);
+      });
+      const { bounds, area } = await panelBounds();
+      assert.ok(bounds.x >= area.x && bounds.y >= area.y);
+      assert.ok(bounds.x + bounds.width <= area.x + area.width);
+      assert.ok(bounds.y + bounds.height <= area.y + area.height);
+      assert.equal(await panel.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    }
+    await expectHeight(588);
+    const shape = await app.evaluate(async ({ BrowserWindow }) => {
+      const win = BrowserWindow.getAllWindows().find(win => win.getTitle() === 'BytePet 유틸리티');
+      const capture = await win.capturePage();
+      const pixels = capture.toBitmap();
+      const { width, height } = capture.getSize();
+      const alpha = (x, y) => pixels[(y * width + x) * 4 + 3];
+      return { cornerAlpha: pixels[3], outsideRoofAlpha: alpha(Math.floor(width * .1), Math.floor(height * .04)), hasOpaqueSurface: pixels.some((value, index) => index % 4 === 3 && value === 255) };
+    });
+    assert.equal(shape.cornerAlpha, 0, 'the house has real native transparency outside its outline');
+    assert.equal(shape.outsideRoofAlpha, 0, 'the area above the roof slope has no window background');
+    assert.equal(shape.hasOpaqueSurface, true, 'the menu itself remains opaque and readable');
+
+    await mkdir(path.join(root, 'test-results'), { recursive: true });
+    await panel.screenshot({ path: path.join(root, 'test-results/panel-food.png') });
+    await panel.locator('#draft').fill('{"project":"BytePet","enabled":true}');
+    await panel.locator('#run-tool').click();
+    assert.ok((await panel.locator('.toolbar').boundingBox()).y >= 0);
+    await panel.screenshot({ path: path.join(root, 'test-results/panel-result.png') });
+    await panel.locator('#show-settings').click();
+    await expectHeight(530);
+    assert.equal(await panel.locator('#module-m01').evaluate(el => el === document.activeElement), true);
+    await panel.screenshot({ path: path.join(root, 'test-results/panel-settings.png') });
+    await pet.evaluate(() => window.utilityPanel.setView('food'));
+    await panel.evaluate(() => window.utilityPanel.setView('invalid'));
+    assert.equal((await panelBounds()).bounds.height, Math.min(530, (await panelBounds()).area.height - 10));
+
+    await app.evaluate(({ ipcMain }) => {
+      ipcMain.removeHandler('ports:list');
+      ipcMain.handle('ports:list', () => ({ ok: true, value: {
+        checkedAt: new Date().toISOString(),
+        items: Array.from({ length: 12 }, (_, index) => ({
+          port: 3000 + index, pid: 9000 + index, name: index ? 'node' : 'development-server-with-a-long-name',
+          addresses: [{ family: 'IPv4', address: '127.0.0.1' }, { family: 'IPv6', address: '::1' }],
+          url: `http://127.0.0.1:${3000 + index}/`,
+        })),
+      } }));
+    });
+    await panel.locator('#show-ports').click();
+    await expectHeight(588);
+    await panel.waitForFunction(() => document.querySelectorAll('#port-list li').length === 12);
+    await panel.locator('.port-details summary').first().click();
+    assert.equal(await panel.locator('.port-addresses').first().isVisible(), true);
+    await panel.screenshot({ path: path.join(root, 'test-results/panel-ports.png') });
+    await panel.evaluate(() => { const content = document.querySelector('.content'); content.scrollTo(0, content.scrollHeight); });
+    assert.ok((await panel.locator('.toolbar').boundingBox()).y >= 0);
+    await panel.locator('#show-food').click();
+    assert.equal(await panel.locator('#draft').inputValue(), '{"project":"BytePet","enabled":true}');
+    assert.equal(await panel.locator('#json-result').isVisible(), true);
+    await panel.locator('#feed-text').click();
+    await panel.waitForFunction(() => document.querySelectorAll('#food-list li').length === 1);
+    await panel.screenshot({ path: path.join(root, 'test-results/panel-shelf.png') });
+    await setModule(panel, 'm01', false);
+    await panel.locator('#show-food').click();
+    await expectHeight(298);
+    assert.equal(await panel.locator('#enable-module').isVisible(), true);
+    await panel.locator('#close').click();
+    await pet.evaluate(() => window.petPanel.toggle());
+    await expectHeight(298);
+    await panel.locator('#enable-module').click();
+    await expectHeight(530);
+  } finally { await app.close(); }
+});
+
+test('Layout: cat stays still, left/right and ground switches apply immediately and survive restart', { timeout: 30000 }, async t => {
+  const profile = await profileFor(t);
+  let app = await launch(profile);
+  try {
+    let { pet, panel } = await openPanel(app);
+    await panel.locator('#draft').fill('keep this draft');
+    await panel.locator('#close').click();
+    await pet.emulateMedia({ reducedMotion: 'no-preference' });
+    await pet.mouse.move(4, 4);
+    const initial = await pet.locator('#pet').boundingBox();
+    const anchor = await bounds(app);
+    await pet.waitForTimeout(3000);
+    assert.deepEqual(await pet.locator('#pet').boundingBox(), initial, 'no autonomous travel');
+    assert.deepEqual(await bounds(app), anchor);
+    await pet.evaluate(() => window.petPanel.toggle());
+    await panel.locator('#show-settings').click();
+    assert.equal((await pet.evaluate(() => window.appearance.set('ground', false))).ok, false, 'pet cannot change settings');
+    assert.equal((await panel.evaluate(() => window.appearance.set('menuSide', 'anywhere'))).ok, false);
+
+    await panel.locator('#menu-side').selectOption('right');
+    await panel.waitForFunction(() => !document.querySelector('#menu-side').disabled && document.querySelector('#appearance-status').textContent.includes('저장했어요'));
+    assert.equal(await pet.locator('#pet').evaluate(el => el.getBoundingClientRect().x), 16);
+    let house = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(win => win.getTitle() === 'BytePet 유틸리티').getBounds());
+    let yard = await bounds(app);
+    assert.equal(house.x + house.width, yard.x + yard.width);
+    assert.equal(house.y + house.height - 10, yard.y + yard.height - 20);
+    await panel.locator('#show-ground').uncheck();
+    await pet.waitForFunction(() => innerWidth === 128 && document.querySelector('#yard-ground').hidden);
+    house = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(win => win.getTitle() === 'BytePet 유틸리티').getBounds());
+    yard = await bounds(app);
+    assert.equal(house.x, yard.x + yard.width + 8);
+    assert.deepEqual(JSON.parse(await readFile(path.join(profile, 'appearance.json'), 'utf8')), { version: 1, preferences: { ground: false, menuSide: 'right' } });
+    await panel.locator('#show-food').click();
+    assert.equal(await panel.locator('#draft').inputValue(), 'keep this draft');
+    await app.close();
+
+    app = await launch(profile);
+    ({ pet, panel } = await openPanel(app));
+    assert.equal((await bounds(app)).width, 128);
+    assert.equal(await pet.locator('#yard-ground').isVisible(), false);
+    await panel.locator('#show-settings').click();
+    assert.equal(await panel.locator('#menu-side').inputValue(), 'right');
+    assert.equal(await panel.locator('#show-ground').isChecked(), false);
+    await panel.locator('#show-ground').check();
+    await pet.waitForFunction(() => innerWidth === 496 && !document.querySelector('#yard-ground').hidden);
+    await panel.locator('#menu-side').selectOption('left');
+    await pet.waitForFunction(() => document.querySelector('#pet').getBoundingClientRect().x === innerWidth - 112);
+    house = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(win => win.getTitle() === 'BytePet 유틸리티').getBounds());
+    yard = await bounds(app);
+    assert.equal(house.x, yard.x);
+    await mkdir(path.join(root, 'test-results'), { recursive: true });
+    await panel.screenshot({ path: path.join(root, 'test-results/layout-settings.png'), omitBackground: true });
+    await panel.locator('#close').click();
+    const beforeDrag = await bounds(app);
+    await pet.mouse.move(220, 115);
+    await pet.mouse.down();
+    await pet.mouse.move(200, 105);
+    await waitUntil(async () => (await bounds(app)).x < beforeDrag.x);
+    await pet.mouse.up();
+    assert.equal(await pet.locator('#pet').getAttribute('aria-expanded'), 'false');
+    await pet.screenshot({ path: path.join(root, 'test-results/yard-static.png'), omitBackground: true });
   } finally { await app.close(); }
 });

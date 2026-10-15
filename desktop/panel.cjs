@@ -1,15 +1,21 @@
 const { BrowserWindow, ipcMain, screen, clipboard, shell, dialog, app } = require('electron');
 const path = require('node:path');
-const { getPanelBounds } = require('./window.cjs');
+const { getPanelBounds, getYardBoundsForPanel } = require('./window.cjs');
 const { createFoodService } = require('./food.cjs');
 const { createResultService } = require('./results.cjs');
 const { createPortService } = require('./ports.cjs');
+const { createAppearanceService } = require('./appearance.cjs');
 const { createModuleService, createModuleStore } = require('./modules.cjs');
 
-function createUtilityPanel(pet) {
+function createUtilityPanel(pet, { appearanceStore, appearanceInitial, applyAppearance }) {
   let panel;
   let open = false;
   let ready = false;
+  const viewHeights = { food: 588, ports: 588, settings: 530, off: 298 };
+  let view = 'food';
+  const appearance = createAppearanceService({
+    ipcMain, store: appearanceStore, initial: appearanceInitial, getPet: () => pet, getPanel: () => panel, apply: applyAppearance,
+  });
   const modules = createModuleService({ ipcMain, store: createModuleStore(app.getPath('userData')), getPet: () => pet, getPanel: () => panel });
   const food = createFoodService(pet, () => panel);
   const results = createResultService({ ipcMain, clipboard, pet, getPanel: () => panel });
@@ -43,8 +49,14 @@ function createUtilityPanel(pet) {
   }
   function reposition() {
     if (!panel || panel.isDestroyed()) return;
-    const bounds = pet.getBounds();
-    panel.setBounds(getPanelBounds(bounds, screen.getDisplayMatching(bounds).workArea));
+    let bounds = pet.getBounds();
+    const area = screen.getDisplayMatching(bounds).workArea;
+    if (open) {
+      const next = getYardBoundsForPanel(bounds, area, viewHeights[view], appearance.state().preferences);
+      if (Object.keys(next).some(key => next[key] !== bounds[key])) pet.setBounds(next);
+      bounds = next;
+    }
+    panel.setBounds(getPanelBounds(bounds, area, viewHeights[view], appearance.state().preferences));
   }
   function show() {
     if (!ready || !open || !panel) return;
@@ -61,9 +73,9 @@ function createUtilityPanel(pet) {
   function create() {
     const bounds = pet.getBounds();
     const win = new BrowserWindow({
-      ...getPanelBounds(bounds, screen.getDisplayMatching(bounds).workArea),
+      ...getPanelBounds(bounds, screen.getDisplayMatching(bounds).workArea, viewHeights[view], appearance.state().preferences),
       title: 'BytePet 유틸리티', parent: pet, modal: false,
-      frame: false, backgroundColor: '#fffaf0', hasShadow: true,
+      frame: false, transparent: true, backgroundColor: '#00000000', hasShadow: false,
       show: false, resizable: false, maximizable: false, minimizable: false,
       fullscreenable: false, alwaysOnTop: true, acceptFirstMouse: true,
       webPreferences: {
@@ -89,9 +101,9 @@ function createUtilityPanel(pet) {
     if (!from(event, pet)) return;
     if (open) return hide();
     open = true;
+    publish();
     if (!panel) create();
     show();
-    publish();
   }
   function close(event) {
     if (from(event, panel) || from(event, pet)) hide();
@@ -99,6 +111,12 @@ function createUtilityPanel(pet) {
   function rendererReady(event) {
     if (from(event, panel)) show();
   }
+  function changeView(event, next) {
+    if (!from(event, panel) || typeof next !== 'string' || !Object.hasOwn(viewHeights, next)) return;
+    view = next;
+    reposition();
+  }
+  ipcMain.on('panel:view', changeView);
   ipcMain.on('pet:panel-toggle', toggle);
   ipcMain.on('panel:close', close);
   ipcMain.on('panel:ready', rendererReady);
@@ -107,6 +125,7 @@ function createUtilityPanel(pet) {
   return {
     reposition,
     dispose() {
+      appearance.dispose();
       modules.dispose();
       food.dispose();
       results.dispose();
@@ -114,6 +133,7 @@ function createUtilityPanel(pet) {
       ipcMain.removeListener('pet:panel-toggle', toggle);
       ipcMain.removeListener('panel:close', close);
       ipcMain.removeListener('panel:ready', rendererReady);
+      ipcMain.removeListener('panel:view', changeView);
       if (panel && !panel.isDestroyed()) panel.destroy();
     },
   };

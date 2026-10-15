@@ -1,13 +1,15 @@
 import { moduleEnabled, moduleState, modulesReady, onModulesChanged } from './module-state.js';
 import { drawCat, drawEatingCat, drawResultCat, drawAttackCat } from './cat.js';
+import { appearanceReady, appearanceState, onAppearanceChanged } from './appearance-state.js';
 import { createReactionPlayer } from './reaction.js';
 import { enableDragging } from './drag.js';
 import { isCanvasHit, createHitRegionReporter } from './hit-test.js';
 import { enableFoodDrop, resultMessage } from './feeding.js';
 
-await modulesReady;
+await Promise.all([modulesReady, appearanceReady]);
 const canvas = document.querySelector('#pet');
 enableDragging(canvas, window.petDrag, event => isCanvasHit(canvas, event), () => window.petPanel.toggle());
+enableDragging(document.querySelector('#yard-ground'), window.petDrag);
 window.petPanel.onState(open => canvas.setAttribute('aria-expanded', String(open)));
 canvas.addEventListener('keydown', event => {
   if ((event.key === 'Enter' || event.key === ' ') && !event.repeat) {
@@ -94,12 +96,22 @@ function render() {
 function updateAnimation() {
   clearInterval(timer);
   render();
-  // A pixel idle animation needs only 10fps, not a permanent 60fps loop.
+  // A stationary pixel pet only needs 10fps for its idle and reaction frames.
   if (!document.hidden && !reducedMotion.matches) timer = setInterval(render, 100);
 }
 
 reducedMotion.addEventListener('change', updateAnimation);
 document.addEventListener('visibilitychange', updateAnimation);
 window.addEventListener('pagehide', () => { clearInterval(timer); clearTimeout(messageTimer); reactions.dispose(); }, { once: true });
-window.addEventListener('resize', reportHitRegion);
+function applyAppearance() {
+  const { ground, menuSide } = appearanceState().preferences;
+  document.querySelector('#yard-ground').hidden = !ground;
+  const x = ground && menuSide === 'left' ? Math.max(0, innerWidth - 112) : Math.min(16, Math.max(0, innerWidth - 96));
+  canvas.style.left = `${x}px`;
+  message.style.left = `${Math.max(0, Math.min(innerWidth - 128, x - 16))}px`;
+  reportHitRegion();
+}
+window.addEventListener('resize', applyAppearance);
+onAppearanceChanged(applyAppearance);
+applyAppearance();
 updateAnimation();

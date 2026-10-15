@@ -3,14 +3,14 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { getInitialBounds, getVisibleBounds, getPanelBounds } from '../desktop/window.cjs';
+import { getInitialBounds, getVisibleBounds, getPanelBounds, getYardBoundsForPanel } from '../desktop/window.cjs';
 import { createPositionStore } from '../desktop/position-store.cjs';
 import { getIdlePose, CYCLE_MS } from '../desktop/cat.js';
-import { isHitRegion, hitsRegion } from '../desktop/input.cjs';
+import { isHitRegion, hitsRegion, createPetInput } from '../desktop/input.cjs';
 
 test('initial placement respects work area origin and dock reservation', () => {
   assert.deepEqual(getInitialBounds({ x: -1920, y: 30, width: 1920, height: 1000 }), {
-    x: -152, y: 878, width: 128, height: 128,
+    x: -520, y: 878, width: 496, height: 128,
   });
 });
 
@@ -37,21 +37,21 @@ const secondary = { x: -1920, y: -200, width: 1920, height: 1080 };
 test('restores positions on either display, including negative coordinates', () => {
   for (const position of [{ x: 400, y: 300 }, { x: -1600, y: -100 }]) {
     assert.deepEqual(getVisibleBounds(position, [primary, secondary], primary), {
-      ...position, width: 128, height: 128,
+      ...position, width: 496, height: 128,
     });
   }
 });
 
 test('keeps the entire pet inside a work area after disconnects or resolution changes', () => {
   assert.deepEqual(getVisibleBounds({ x: -1600, y: -100 }, [primary], primary), {
-    x: 0, y: 30, width: 128, height: 128,
+    x: 0, y: 30, width: 496, height: 128,
   });
   assert.deepEqual(getVisibleBounds({ x: 1400, y: 880 }, [primary], primary), {
-    x: 1312, y: 772, width: 128, height: 128,
+    x: 944, y: 772, width: 496, height: 128,
   });
   const tiny = { x: 40, y: 50, width: 100, height: 100 };
   assert.deepEqual(getVisibleBounds({ x: 90, y: 90 }, [tiny], tiny), {
-    x: 40, y: 50, width: 128, height: 128,
+    x: 40, y: 50, width: 100, height: 100,
   });
 });
 
@@ -111,19 +111,41 @@ test('invalid or oversized hit regions from the renderer are rejected', () => {
   }
 });
 
-test('panel remains on its display and avoids covering the pet near each edge', () => {
-  for (const area of [primary, secondary]) {
-    for (const offset of [{ x: 0, y: 0 }, { x: area.width - 128, y: 0 }, { x: 0, y: area.height - 128 }, { x: area.width - 128, y: area.height - 128 }]) {
-      const pet = { x: area.x + offset.x, y: area.y + offset.y, width: 128, height: 128 };
-      const panel = getPanelBounds(pet, area);
-      assert.ok(panel.x >= area.x && panel.y >= area.y);
-      assert.ok(panel.x + panel.width <= area.x + area.width && panel.y + panel.height <= area.y + area.height);
-      assert.ok(panel.x + panel.width <= pet.x || panel.x >= pet.x + pet.width || panel.y + panel.height <= pet.y || panel.y >= pet.y + pet.height);
+test('all menu directions and ground settings keep the house beside the cat and inside the display', () => {
+  for (const area of [primary, secondary, { x: -200, y: 40, width: 300, height: 250 }]) {
+    for (const preferences of [{ ground: true, menuSide: 'left' }, { ground: true, menuSide: 'right' }, { ground: false, menuSide: 'left' }, { ground: false, menuSide: 'right' }]) {
+      for (const height of [588, 530, 298]) {
+        for (const position of [{ x: area.x, y: area.y }, { x: area.x + area.width, y: area.y + area.height }]) {
+          const yard = getYardBoundsForPanel({ ...position, width: 496, height: 128 }, area, height, preferences);
+          const house = getPanelBounds(yard, area, height, preferences);
+          const catLeft = yard.x + (preferences.ground && preferences.menuSide === 'left' ? yard.width - 112 : 16);
+          if (preferences.menuSide === 'left') assert.ok(house.x + house.width <= catLeft);
+          else assert.ok(house.x >= catLeft + 96);
+          assert.equal(house.y + house.height - 10, yard.y + yard.height - 20);
+          assert.ok(house.x >= area.x && house.x + house.width <= area.x + area.width);
+          assert.ok(house.y >= area.y);
+          assert.ok(yard.x >= area.x && yard.x + yard.width <= area.x + area.width);
+          assert.ok(yard.y + yard.height <= area.y + area.height);
+        }
+      }
     }
   }
 });
 
-test('panel fits a work area smaller than its preferred size', () => {
-  const area = { x: -200, y: 40, width: 300, height: 250 };
-  assert.deepEqual(getPanelBounds({ x: -100, y: 70, width: 128, height: 128 }, area), area);
+test('hiding the ground also releases its native mouse interception', t => {
+  let ignoring;
+  let point = { x: 20, y: 114 };
+  const win = {
+    isDestroyed: () => false,
+    getContentBounds: () => ({ x: 0, y: 0, width: 128, height: 128 }),
+    setIgnoreMouseEvents: value => { ignoring = value; },
+  };
+  const input = createPetInput(win, { getCursorScreenPoint: () => point }, true);
+  t.after(() => input.dispose());
+  assert.equal(ignoring, false, 'visible grass receives dragging');
+  input.setGroundVisible(false);
+  assert.equal(ignoring, true, 'hidden grass lets clicks through');
+  point = { x: 64, y: 16 };
+  input.update(hitRegion);
+  assert.equal(ignoring, false, 'the cat remains interactive');
 });

@@ -113,7 +113,12 @@ export function setupPortsPanel() {
         const addresses = document.createElement('p');
         addresses.className = 'port-addresses';
         addresses.textContent = item.addresses.map(({ family, address }) => `${family} ${address}`).join(' · ');
-        row.append(heading, meta, addresses);
+        const details = document.createElement('details');
+        details.className = 'port-details';
+        const summary = document.createElement('summary');
+        summary.textContent = '수신 주소';
+        details.append(summary, addresses);
+        row.append(heading, meta, details);
         const url = document.createElement('p');
         url.className = 'port-url';
         url.textContent = item.url || '브라우저로 열 수 있는 주소가 없어요.';
@@ -122,9 +127,9 @@ export function setupPortsPanel() {
         const open = document.createElement('button');
         open.type = 'button';
         open.className = 'open-port';
-        open.textContent = '브라우저로 열기';
+        open.textContent = '열기';
         open.setAttribute('aria-label', `${item.port} 포트 브라우저로 열기`);
-        open.title = item.url || '열 수 있는 주소 없음';
+        open.title = item.url ? `${item.url} · HTTP로 열기` : '열 수 있는 주소 없음';
         open.dataset.unavailable = String(!item.url);
         open.disabled = opening || !item.url;
         const feedback = document.createElement('p');
@@ -136,7 +141,7 @@ export function setupPortsPanel() {
         const terminate = document.createElement('button');
         terminate.type = 'button';
         terminate.className = 'terminate-port';
-        terminate.textContent = '프로세스 종료';
+        terminate.textContent = '종료';
         terminate.setAttribute('aria-label', `PID ${item.pid} 프로세스 종료`);
         terminate.title = item.terminationBlocked || '프로세스의 모든 작업과 포트를 종료해요';
         terminate.dataset.unavailable = String(Boolean(item.terminationBlocked));

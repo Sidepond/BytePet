@@ -10,6 +10,16 @@ contextBridge.exposeInMainWorld('modules', {
   },
 });
 
+contextBridge.exposeInMainWorld('appearance', {
+  get: () => ipcRenderer.invoke('appearance:get'),
+  set: (key, value) => ipcRenderer.invoke('appearance:set', { key, value }),
+  onChanged: callback => {
+    const listener = (_event, state) => callback(state);
+    ipcRenderer.on('appearance:changed', listener);
+    return () => ipcRenderer.removeListener('appearance:changed', listener);
+  },
+});
+
 // Narrow bridges only; the renderer has no unrestricted file or clipboard access.
 contextBridge.exposeInMainWorld('petDrag', {
   start: (x, y) => ipcRenderer.send('pet:drag', 'start', { x, y }),
@@ -34,6 +44,7 @@ contextBridge.exposeInMainWorld('petPanel', {
 contextBridge.exposeInMainWorld('utilityPanel', {
   close: () => ipcRenderer.send('panel:close'),
   ready: () => ipcRenderer.send('panel:ready'),
+  setView: view => ipcRenderer.send('panel:view', view),
   onOpen: callback => {
     const listener = () => callback();
     ipcRenderer.on('panel:opened', listener);

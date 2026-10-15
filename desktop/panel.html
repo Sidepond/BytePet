@@ -9,62 +9,93 @@
   </head>
   <body>
     <main role="dialog" aria-modal="false" aria-labelledby="panel-title">
-      <header>
-        <div><p class="brand">BYTEPET <span>●</span></p><h1 id="panel-title">오늘의 먹이</h1></div>
+      <svg class="house-roof" viewBox="0 0 340 90" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+        <defs>
+          <clipPath id="roof-tiles"><path d="M5 81 L170 7 L335 81 Z"/></clipPath>
+        </defs>
+        <path class="chimney" d="M252 52 V23 H272 V63 Z"/>
+        <rect class="chimney-cap" x="248" y="18" width="28" height="8" rx="2"/>
+        <path class="chimney-joints" d="M253 34 H271 M253 44 H271 M262 26 V34 M259 34 V44"/>
+        <path class="roof-surface" d="M4 80 L165 6 Q170 3 175 6 L336 80 Q340 83 337 87 H3 Q0 83 4 80 Z"/>
+        <g class="roof-tiles" clip-path="url(#roof-tiles)">
+          <path d="M0 31 H340 M0 49 H340 M0 67 H340 M145 13 V31 M185 13 V31 M118 31 V49 M158 31 V49 M198 31 V49 M238 31 V49 M57 49 V67 M97 49 V67 M137 49 V67 M177 49 V67 M217 49 V67 M257 49 V67 M37 67 V85 M77 67 V85 M117 67 V85 M157 67 V85 M197 67 V85 M237 67 V85 M277 67 V85 M317 67 V85"/>
+        </g>
+        <path class="roof-ridge" d="M6 80 L167 7 Q170 5 173 7 L334 80"/>
+        <rect class="roof-eave" x="3" y="83" width="334" height="6" rx="2"/>
+        <circle class="attic-frame" cx="170" cy="54" r="18"/>
+        <circle class="attic-window" cx="170" cy="54" r="13"/>
+        <path class="attic-divider" d="M170 41 V67 M157 54 H183"/>
+      </svg>
+      <h1 id="panel-title" class="sr-only">먹이·변환</h1>
+      <header class="toolbar">
+        <nav class="panel-views" aria-label="패널 보기">
+          <button id="show-food" type="button" aria-pressed="true" aria-controls="food-view">먹이·변환</button>
+          <button id="show-ports" type="button" aria-pressed="false" aria-controls="ports-view">개발 포트</button>
+          <button id="show-settings" type="button" aria-pressed="false" aria-controls="settings-view">설정</button>
+        </nav>
         <button id="close" type="button" aria-label="패널 닫기" title="닫기 (Esc)">×</button>
       </header>
-      <nav class="panel-views" aria-label="패널 보기">
-        <button id="show-food" type="button" aria-pressed="true" aria-controls="food-view">먹이·변환</button>
-        <button id="show-ports" type="button" aria-pressed="false" aria-controls="ports-view">개발 포트</button>
-        <button id="show-settings" type="button" aria-pressed="false" aria-controls="settings-view">설정</button>
-      </nav>
+      <div class="content">
       <section id="module-off" hidden>
         <p id="module-off-message"></p>
-        <p>설정에서 다시 켜면 사용할 수 있어요.</p>
-        <button id="enable-module" type="button">모듈 설정 열기</button>
+
+        <button id="enable-module" type="button">설정 열기</button>
       </section>
       <section id="settings-view" aria-label="모듈 설정" hidden>
-        <h2>필요한 기능만 켜두세요</h2>
-        <p class="settings-hint">변경한 설정은 이 컴퓨터에 저장되며, 앱을 다시 실행해도 유지됩니다.</p>
+        <h2 class="section-label">화면</h2>
+        <div class="settings-group">
+          <label class="module-option" for="menu-side">
+            <strong>메뉴 위치</strong>
+            <select id="menu-side"><option value="left">왼쪽</option><option value="right">오른쪽</option></select>
+          </label>
+          <label class="module-option" for="show-ground">
+            <span><strong>땅 표시</strong><small>집과 고양이 아래에 마당을 표시합니다</small></span>
+            <span class="module-toggle"><input id="show-ground" type="checkbox" role="switch" checked></span>
+          </label>
+        </div>
+        <p id="appearance-status" role="status" aria-live="polite"></p>
+        <h2 class="section-label feature-label">사용할 기능</h2>
+        <div class="settings-group">
         <label class="module-option" for="module-m01">
-          <span><strong>M01 먹이·변환</strong><small>텍스트·파일 보관, JWT·JSON 도구와 결과 복사</small></span>
-          <span class="module-toggle"><span id="state-m01">ON</span><input id="module-m01" type="checkbox" role="switch" checked></span>
+          <span><strong>먹이·변환</strong><small>텍스트·파일 보관, JWT·JSON 변환</small></span>
+          <span class="module-toggle"><span id="state-m01" class="sr-only" aria-hidden="true">ON</span><input id="module-m01" type="checkbox" role="switch" checked></span>
         </label>
         <label class="module-option" for="module-m02">
-          <span><strong>M02 개발 포트</strong><small>포트 조회, 브라우저 열기와 프로세스 종료</small></span>
-          <span class="module-toggle"><span id="state-m02">ON</span><input id="module-m02" type="checkbox" role="switch" checked></span>
+          <span><strong>개발 포트</strong><small>포트 확인, 브라우저 열기, 프로세스 종료</small></span>
+          <span class="module-toggle"><span id="state-m02" class="sr-only" aria-hidden="true">ON</span><input id="module-m02" type="checkbox" role="switch" checked></span>
         </label>
-        <p class="settings-hint">끄면 진행 중인 작업과 관련 반응을 중단해요. 저장된 먹이와 입력 초안은 유지됩니다.</p>
-        <p class="settings-hint">이미 완료된 저장·복사나 브라우저 열기, 전송된 종료 신호는 되돌리지 않아요.</p>
+        </div>
         <p id="settings-status" role="status" aria-live="polite"></p>
       </section>
       <section id="food-view" aria-label="먹이와 변환">
-      <label for="draft">텍스트 먹이</label>
-      <textarea id="draft" spellcheck="false" placeholder="텍스트를 붙여넣거나, 파일·사진을 여기로 드롭하세요." aria-describedby="draft-hint"></textarea>
-      <p id="draft-hint">텍스트 1MB · 파일당 25MB · 한 번에 10개</p>
+      <div class="editor">
+        <label for="draft" class="sr-only">텍스트 먹이</label>
+        <textarea id="draft" spellcheck="false" placeholder="텍스트 붙여넣기
+또는 파일·사진을 드롭하세요" aria-describedby="draft-hint"></textarea>
+        <div class="utility-actions" aria-label="텍스트 도구">
+          <label for="input-format" class="sr-only">입력 형식</label>
+          <select id="input-format" aria-describedby="format-hint" title="입력 형식">
+            <option value="auto">자동 감지</option>
+            <option value="jwt">JWT</option>
+            <option value="json">JSON</option>
+          </select>
+          <button id="run-tool" type="button" aria-controls="jwt-result json-result" disabled>도구 실행</button>
+        </div>
+      </div>
+      <p id="draft-hint" class="sr-only">텍스트 1MB · 파일당 25MB · 한 번에 10개</p>
+      <p id="format-hint" role="status" aria-live="polite"></p>
       <div class="feed-actions">
-        <button id="feed-text" type="button">먹이 주기</button>
-        <button id="choose-files" type="button">파일·사진 선택</button>
+        <button id="choose-files" type="button" title="파일당 25MB · 한 번에 10개">파일·사진 선택</button>
+        <button id="feed-text" type="button" title="텍스트를 로컬 보관함에 저장">먹이 주기</button>
         <input id="files" type="file" multiple hidden>
       </div>
-      <div class="utility-actions" aria-label="텍스트 도구">
-        <label for="input-format">입력 형식</label>
-        <select id="input-format" aria-describedby="format-hint">
-          <option value="auto">자동</option>
-          <option value="jwt">JWT</option>
-          <option value="json">JSON</option>
-        </select>
-        <button id="run-tool" type="button" aria-controls="jwt-result json-result" disabled>도구 실행</button>
-      </div>
-      <p id="format-hint" role="status" aria-live="polite"></p>
-      <p id="feed-status" role="status" aria-live="polite">먹인 내용은 이 컴퓨터에 저장됩니다.</p>
+      <p id="feed-status" role="status" aria-live="polite"></p>
       <section id="jwt-result" aria-labelledby="jwt-title" tabindex="-1" hidden>
         <div class="shelf-header"><h2 id="jwt-title">JWT 해독 결과</h2><button id="close-jwt" type="button">결과 닫기</button></div>
         <p id="jwt-error" role="alert" hidden></p>
         <div id="jwt-output" hidden>
           <p id="jwt-signature"></p>
           <p id="jwt-expiration" role="status" aria-live="polite"></p>
-          <p class="jwt-hint">현재 컴퓨터 시각 기준 · 해독만으로는 저장되지 않아요.</p>
           <h3 id="jwt-header-title">Header</h3>
           <pre id="jwt-header" tabindex="0" aria-labelledby="jwt-header-title"></pre>
           <h3 id="jwt-payload-title">Payload</h3>
@@ -79,31 +110,28 @@
       </section>
       <section id="json-result" aria-labelledby="json-title" tabindex="-1" hidden>
         <div class="shelf-header"><h2 id="json-title">JSON 정리 결과</h2><button id="close-json" type="button">결과 닫기</button></div>
-        <p class="jwt-hint">2칸 들여쓰기 · 원문은 유지하고 자동 저장하지 않아요.</p>
         <p id="json-error" role="alert" hidden></p>
         <button id="json-error-location" type="button" hidden>오류 위치로 이동</button>
         <pre id="json-output" tabindex="0" aria-labelledby="json-title" hidden></pre>
         <div class="copy-actions"><button id="copy-json" type="button" disabled>결과 복사</button></div>
         <p id="json-copy-status" class="copy-status" role="status" aria-live="polite"></p>
       </section>
-      <section aria-labelledby="shelf-title">
+      <section class="shelf" aria-labelledby="shelf-title">
         <div class="shelf-header"><h2 id="shelf-title">보관함</h2><button id="open-folder" type="button">폴더 열기</button></div>
         <ul id="food-list" aria-label="저장된 먹이"></ul>
-        <p id="empty-shelf">아직 먹이가 없어요. 첫 먹이를 주세요!</p>
+        <p id="empty-shelf">저장된 먹이가 없습니다</p>
       </section>
       </section>
       <section id="ports-view" aria-label="개발 포트 목록" hidden>
-        <div class="shelf-header"><h2>TCP 리스닝 포트</h2><button id="refresh-ports" type="button">새로고침</button></div>
-        <p class="port-hint">현재 사용자 권한으로 확인 가능한 포트입니다. *는 모든 인터페이스에서 수신하는 주소예요.</p>
-        <p class="port-hint">주소는 HTTP로 열어요. HTTPS 전용 서버나 웹 서버가 아닌 포트는 연결되지 않을 수 있어요.</p>
+        <div class="shelf-header"><h2>열린 포트</h2><button id="refresh-ports" type="button">새로고침</button></div>
         <p id="port-status" role="status" aria-live="polite"></p>
-        <p id="ports-updated"></p>
+        <p id="ports-updated" class="sr-only"></p>
         <p id="ports-warning" hidden></p>
         <p id="port-action-status" role="status" aria-live="polite"></p>
         <ul id="port-list" aria-label="리스닝 포트" aria-busy="false"></ul>
         <p id="empty-ports" hidden>조회 가능한 TCP 리스닝 포트가 없어요.</p>
       </section>
-      <footer>BytePet · 로컬 개발 도구<kbd>Esc 닫기</kbd></footer>
+      </div>
     </main>
     <script type="module" src="panel.js"></script>
   </body>

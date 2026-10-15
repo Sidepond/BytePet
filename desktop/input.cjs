@@ -1,7 +1,8 @@
 function isHitRegion(region) {
   return region != null && ['x', 'y', 'width', 'height'].every(key => Number.isFinite(region[key])) &&
     region.x >= 0 && region.y >= 0 && region.width > 0 && region.height > 0 &&
-    region.x + region.width <= 128 && region.y + region.height <= 128 &&
+    region.width <= 128 && region.height <= 128 &&
+    region.x + region.width <= 496 && region.y + region.height <= 128 &&
     Number.isInteger(region.columns) && region.columns > 0 && region.columns <= 128 &&
     Number.isInteger(region.rows) && region.rows > 0 && region.rows <= 128 &&
     Array.isArray(region.alpha) && region.alpha.length === region.columns * region.rows &&
@@ -16,7 +17,12 @@ function hitsRegion(region, point) {
     region.alpha[y * region.columns + x] > 0;
 }
 
-function createPetInput(win, screen) {
+function hitsGround(point, bounds) {
+  return point.x >= 8 && point.x < bounds.width - 8 &&
+    point.y >= bounds.height - 20 && point.y < bounds.height - 4;
+}
+
+function createPetInput(win, screen, groundVisible = true) {
   let region = null;
   let ignoring;
   const holds = new Set();
@@ -25,7 +31,8 @@ function createPetInput(win, screen) {
     if (win.isDestroyed()) return;
     const cursor = screen.getCursorScreenPoint();
     const bounds = win.getContentBounds();
-    const hit = hitsRegion(region, { x: cursor.x - bounds.x, y: cursor.y - bounds.y });
+    const point = { x: cursor.x - bounds.x, y: cursor.y - bounds.y };
+    const hit = hitsRegion(region, point) || (groundVisible && hitsGround(point, bounds));
     const next = holds.size === 0 && !hit;
     if (next !== ignoring) {
       win.setIgnoreMouseEvents(next, { forward: true });
@@ -39,12 +46,13 @@ function createPetInput(win, screen) {
   const timer = setInterval(refresh, 20);
   refresh();
   return {
+    setGroundVisible(value) { groundVisible = value; refresh(); },
     update(next) {
       if (!isHitRegion(next)) return;
       region = next;
       refresh();
     },
-    hits: point => hitsRegion(region, point),
+    hits: point => hitsRegion(region, point) || (groundVisible && hitsGround(point, win.getContentBounds())),
     hold(reason, active) {
       if (active) holds.add(reason);
       else holds.delete(reason);

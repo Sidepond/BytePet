@@ -1,3 +1,4 @@
+import { appearanceReady, appearanceState, onAppearanceChanged } from './appearance-state.js';
 import { moduleEnabled, modulesReady, moduleState, onModulesChanged } from './module-state.js';
 import { enableFoodDrop, resultMessage } from './feeding.js';
 import { setupJwtPanel } from './jwt-panel.js';
@@ -5,7 +6,7 @@ import { setupJsonPanel } from './json-panel.js';
 import { setupFormatPanel } from './format-panel.js';
 import { setupPortsPanel } from './ports-panel.js';
 
-await modulesReady;
+await Promise.all([modulesReady, appearanceReady]);
 const draft = document.querySelector('#draft');
 const jwt = setupJwtPanel(draft, () => json.clear());
 const json = setupJsonPanel(draft, () => jwt.clear());
@@ -19,6 +20,7 @@ const ports = setupPortsPanel();
 let view = 'food';
 function renderView() {
   const off = (view === 'food' && !moduleEnabled('m01')) || (view === 'ports' && !moduleEnabled('m02'));
+  window.utilityPanel.setView(off ? 'off' : view);
   document.querySelector('#food-view').hidden = view !== 'food' || off;
   document.querySelector('#ports-view').hidden = view !== 'ports' || off;
   document.querySelector('#settings-view').hidden = view !== 'settings';
@@ -35,7 +37,7 @@ function focusView() {
 function showView(next) {
   view = next;
   renderView();
-  window.scrollTo(0, 0);
+  document.querySelector('.content').scrollTo(0, 0);
   if (next === 'ports') ports.refresh();
   else if (next === 'food') refresh();
   focusView();
@@ -87,16 +89,20 @@ async function refresh() {
     const name = document.createElement('span');
     name.className = 'item-name';
     name.textContent = item.name;
+    name.title = item.name;
     const meta = document.createElement('p');
     meta.className = 'item-meta';
     const size = item.size < 1024 ? `${item.size} B` : `${(item.size / 1024).toFixed(1)} KB`;
-    meta.textContent = `${item.kind === 'text' ? '텍스트' : '파일'} · ${size} · ${new Date(item.createdAt).toLocaleString('ko-KR')}`;
+    meta.title = new Date(item.createdAt).toLocaleString('ko-KR');
+    meta.textContent = `${item.kind === 'text' ? '텍스트' : '파일'} · ${size}`;
     const actions = document.createElement('div');
     actions.className = 'item-actions';
     function button(label, run) {
       const control = document.createElement('button');
       control.type = 'button';
-      control.textContent = label;
+      control.textContent = label === '텍스트 불러오기' ? '불러오기' : label === '파일 열기' ? '열기' : '위치';
+      control.setAttribute('aria-label', label);
+      control.title = label;
       control.addEventListener('click', async () => {
         if (!moduleEnabled('m01')) return;
         const current = foodGeneration;
@@ -173,8 +179,8 @@ function syncSettings() {
     document.querySelector(`#module-${key}`).disabled = settingBusy;
     document.querySelector(`#state-${key}`).textContent = moduleEnabled(key) ? 'ON' : 'OFF';
   }
-  document.querySelector('#show-food').textContent = moduleEnabled('m01') ? '먹이·변환' : '먹이·변환 OFF';
-  document.querySelector('#show-ports').textContent = moduleEnabled('m02') ? '개발 포트' : '개발 포트 OFF';
+  document.querySelector('#show-food').title = moduleEnabled('m01') ? '먹이·변환' : '먹이·변환 꺼짐';
+  document.querySelector('#show-ports').title = moduleEnabled('m02') ? '개발 포트' : '개발 포트 꺼짐';
   if (moduleState().warning) {
     settingsStatus.classList.add('error');
     settingsStatus.textContent = moduleState().warning;
@@ -187,7 +193,7 @@ onModulesChanged((next, previous) => {
     clearResults();
     updateFormat();
     list.replaceChildren();
-    feedback('먹인 내용은 이 컴퓨터에 저장됩니다.');
+    feedback('');
     files.value = '';
     busy = false;
     draft.disabled = false;
@@ -211,7 +217,7 @@ for (const key of ['m01', 'm02']) document.querySelector(`#module-${key}`).addEv
   try {
     const response = await window.modules.set(key, enabled);
     if (!response.ok) throw new Error(response.error);
-    settingsStatus.textContent = `${key.toUpperCase()} ${enabled ? 'ON' : 'OFF'} · 저장했어요.`;
+    settingsStatus.textContent = `${key === 'm01' ? '먹이·변환' : '개발 포트'} ${enabled ? '켬' : '끔'} · 저장했어요.`;
   } catch (error) {
     settingsStatus.classList.add('error');
     settingsStatus.textContent = error.message || '설정을 저장하지 못했어요. 다시 시도해 주세요.';
@@ -220,6 +226,42 @@ for (const key of ['m01', 'm02']) document.querySelector(`#module-${key}`).addEv
     syncSettings();
   }
 });
+const sideControl = document.querySelector('#menu-side');
+const groundControl = document.querySelector('#show-ground');
+const appearanceStatus = document.querySelector('#appearance-status');
+let appearanceBusy = false;
+function syncAppearance() {
+  const { preferences, warning } = appearanceState();
+  sideControl.value = preferences.menuSide;
+  groundControl.checked = preferences.ground;
+  sideControl.disabled = groundControl.disabled = appearanceBusy;
+  if (warning) {
+    appearanceStatus.classList.add('error');
+    appearanceStatus.textContent = warning;
+  }
+}
+async function changeAppearance(key, value) {
+  if (appearanceBusy) return;
+  appearanceBusy = true;
+  syncAppearance();
+  appearanceStatus.classList.remove('error');
+  appearanceStatus.textContent = '저장 중…';
+  try {
+    const result = await window.appearance.set(key, value);
+    if (!result.ok) throw new Error(result.error);
+    appearanceStatus.textContent = '저장했어요.';
+  } catch (error) {
+    appearanceStatus.classList.add('error');
+    appearanceStatus.textContent = error.message || '화면 설정을 저장하지 못했어요.';
+  } finally {
+    appearanceBusy = false;
+    syncAppearance();
+  }
+}
+sideControl.addEventListener('change', () => changeAppearance('menuSide', sideControl.value));
+groundControl.addEventListener('change', () => changeAppearance('ground', groundControl.checked));
+onAppearanceChanged(syncAppearance);
+syncAppearance();
 ports.setEnabled(moduleEnabled('m02'));
 syncSettings();
 renderView();

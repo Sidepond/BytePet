@@ -19,8 +19,8 @@ export function setupFormatPanel(draft, tools, clearResults, enabled = () => tru
     run.textContent = selected === 'jwt' ? 'JWT 해독' : selected === 'json' ? 'JSON 정리' : '도구 실행';
     hint.dataset.format = selected ?? '';
     if (mode.value !== 'auto') hint.textContent = `직접 선택 · ${selected.toUpperCase()}`;
-    else if (selected) hint.textContent = `자동 선택 · ${selected.toUpperCase()} (실행 시 내용을 확인해요)`;
-    else if (detection.reason === 'empty') hint.textContent = '텍스트를 입력하면 JWT/JSON을 자동으로 선택해요.';
+    else if (selected) hint.textContent = `자동 선택 · ${selected.toUpperCase()}`;
+    else if (detection.reason === 'empty') hint.textContent = '';
     else if (detection.reason === 'limit') hint.textContent = '자동 선택은 1MB까지 지원해요. 입력을 줄여 주세요.';
     else hint.textContent = '형식을 찾지 못했어요. JWT 또는 JSON을 직접 선택해 주세요.';
     return selected;

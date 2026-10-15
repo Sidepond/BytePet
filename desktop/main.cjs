@@ -3,15 +3,19 @@ const path = require('node:path');
 const { getVisibleBounds, isPosition } = require('./window.cjs');
 const { createPositionStore } = require('./position-store.cjs');
 const { createPetInput } = require('./input.cjs');
+const { createAppearanceStore } = require('./appearance.cjs');
 const { createUtilityPanel } = require('./panel.cjs');
 
 app.setName('BytePet');
 let petWindow;
 
 function createPetWindow() {
+  const appearanceStore = createAppearanceStore(app.getPath('userData'));
+  const appearanceInitial = appearanceStore.read();
+  let preferences = appearanceInitial.preferences;
   const store = createPositionStore(app.getPath('userData'));
   const visibleBounds = position => getVisibleBounds(position,
-    screen.getAllDisplays().map(display => display.workArea), screen.getPrimaryDisplay().workArea);
+    screen.getAllDisplays().map(display => display.workArea), screen.getPrimaryDisplay().workArea, preferences);
   const win = new BrowserWindow({
     ...visibleBounds(store.read()),
     title: 'BytePet',
@@ -33,8 +37,23 @@ function createPetWindow() {
     },
   });
   petWindow = win;
-  const input = createPetInput(win, screen);
-  const panel = createUtilityPanel(win);
+  const input = createPetInput(win, screen, preferences.ground);
+  const panel = createUtilityPanel(win, {
+    appearanceStore, appearanceInitial,
+    applyAppearance(next) {
+      const previous = win.getBounds();
+      const catX = previous.x + (preferences.ground && preferences.menuSide === 'left' ? previous.width - 112 : 16);
+      preferences = next;
+      const area = screen.getDisplayMatching(previous).workArea;
+      const width = Math.min(next.ground ? 496 : 128, area.width);
+      const offset = next.ground && next.menuSide === 'left' ? width - 112 : 16;
+      const bounds = visibleBounds({ x: catX - offset, y: previous.y });
+      input.setGroundVisible(next.ground);
+      win.setBounds(bounds);
+      panel.reposition();
+      savePosition();
+    },
+  });
   win.setAlwaysOnTop(true, 'floating');
   win.once('ready-to-show', () => win.showInactive());
   let drag;
@@ -47,7 +66,7 @@ function createPetWindow() {
     if (win.isDestroyed()) return;
     const current = win.getBounds();
     const next = visibleBounds(current);
-    if (current.x !== next.x || current.y !== next.y) win.setPosition(next.x, next.y);
+    if (Object.keys(next).some(key => current[key] !== next[key])) win.setBounds(next);
     panel.reposition();
     savePosition();
   }
