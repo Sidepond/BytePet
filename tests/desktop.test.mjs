@@ -657,3 +657,101 @@ test('F06: invalid tokens, missing/invalid expiration, unsigned tokens, and live
     assert.equal(await panel.locator('#jwt-output').isVisible(), false);
   } finally { await app.close(); }
 });
+
+test('F07: lossless local JSON formatting, shelf restore, and tool switching', { timeout: 30000 }, async t => {
+  const app = await launch(await profileFor(t));
+  try {
+    const { pet, panel } = await openPanel(app);
+    const errors = [];
+    const requests = [];
+    panel.on('pageerror', error => errors.push(error.message));
+    panel.on('request', request => { if (/^https?:/.test(request.url())) requests.push(request.url()); });
+    const input = '{"name":"고양이 🐱","id":900719925474099312345,"tags":["pet","dev"],"html":"<img src=x onerror=alert(1)>"}';
+    await panel.locator('#draft').fill(input);
+    await panel.locator('#format-json').click();
+    const formatted = await panel.locator('#json-output').textContent();
+    assert.match(formatted, /\n  "name": "고양이 🐱",\n/);
+    assert.match(formatted, /900719925474099312345/);
+    assert.equal(await panel.locator('#draft').inputValue(), input);
+    assert.equal(await panel.locator('#json-output img').count(), 0);
+    assert.equal((await panel.evaluate(() => window.food.list())).value.length, 0);
+    assert.notEqual(await pet.locator('canvas').getAttribute('data-state'), 'eating');
+    assert.equal(await panel.locator('#json-error').isVisible(), false);
+    await mkdir(path.join(root, 'test-results'), { recursive: true });
+    await panel.screenshot({ path: `${root}/test-results/f07-json.png` });
+    await panel.keyboard.press('Escape');
+    await pet.evaluate(() => window.petPanel.toggle());
+    await panel.waitForFunction(() => document.activeElement?.id === 'draft');
+    assert.equal(await panel.locator('#json-output').textContent(), formatted);
+    await panel.locator('#decode-jwt').click();
+    assert.equal(await panel.locator('#json-result').isVisible(), false);
+    assert.equal(await panel.locator('#jwt-error').isVisible(), true);
+    await panel.locator('#format-json').click();
+    assert.equal(await panel.locator('#jwt-result').isVisible(), false);
+    assert.equal(await panel.locator('#json-output').textContent(), formatted);
+    await panel.locator('#close-json').click();
+    assert.equal(await panel.locator('#json-result').isVisible(), false);
+    assert.equal(await panel.locator('#draft').inputValue(), input);
+    await panel.locator('#format-json').click();
+    await panel.locator('#feed-text').click();
+    await panel.waitForFunction(() => document.querySelector('#draft').value === '');
+    assert.equal(await panel.locator('#json-result').isVisible(), false);
+    await panel.getByRole('button', { name: '텍스트 불러오기' }).click();
+    assert.equal(await panel.locator('#draft').inputValue(), input);
+    await panel.locator('#format-json').click();
+    assert.equal(await panel.locator('#json-output').textContent(), formatted);
+    await panel.getByRole('button', { name: '텍스트 불러오기' }).click();
+    assert.equal(await panel.locator('#json-result').isVisible(), false);
+    await panel.locator('#format-json').click();
+    await panel.locator('#draft').fill('null');
+    assert.equal(await panel.locator('#json-result').isVisible(), false);
+    await panel.locator('#format-json').click();
+    assert.equal(await panel.locator('#json-output').textContent(), 'null');
+    assert.deepEqual(errors, []);
+    assert.deepEqual(requests, []);
+  } finally { await app.close(); }
+});
+
+test('F07: JSON errors identify and select original positions, clear stale output, and recover', { timeout: 30000 }, async t => {
+  const app = await launch(await profileFor(t));
+  try {
+    const { panel } = await openPanel(app);
+    await panel.locator('#draft').fill('{"valid":true}');
+    await panel.locator('#format-json').click();
+    const input = '{\n  "name": "고양이 🐱",\n  "items": [1, 2,]\n}';
+    await panel.locator('#draft').fill(input);
+    await panel.locator('#format-json').click();
+    assert.match(await panel.locator('#json-error').textContent(), /3줄 18열.*쉼표/);
+    assert.equal(await panel.locator('#json-output').textContent(), '');
+    assert.equal(await panel.locator('#json-output').isVisible(), false);
+    assert.equal(await panel.locator('#draft').inputValue(), input);
+    await panel.screenshot({ path: `${root}/test-results/f07-error.png` });
+    await panel.locator('#json-error-location').click();
+    assert.deepEqual(await panel.locator('#draft').evaluate(el => ({ start: el.selectionStart, end: el.selectionEnd, focused: document.activeElement === el })), {
+      start: input.indexOf(']'), end: input.indexOf(']') + 1, focused: true,
+    });
+    const long = '[\n' + '  1,\n'.repeat(30) + ']';
+    await panel.locator('#draft').fill(long);
+    await panel.locator('#format-json').click();
+    await panel.locator('#json-error-location').click();
+    assert.equal(await panel.locator('#draft').evaluate(el => el.selectionStart), long.length - 1);
+    await panel.waitForFunction(() => document.querySelector('#draft').scrollTop > 0);
+    await panel.locator('#draft').fill('[1,');
+    await panel.locator('#format-json').click();
+    assert.match(await panel.locator('#json-error').textContent(), /1줄 4열.*끝났/);
+    await panel.locator('#json-error-location').click();
+    assert.equal(await panel.locator('#draft').evaluate(el => el.selectionStart), 3);
+    await panel.locator('#draft').fill('['.repeat(129) + '0' + ']'.repeat(129));
+    await panel.locator('#format-json').click();
+    assert.match(await panel.locator('#json-error').textContent(), /128단계/);
+    // Programmatic fill exercises the UI limit without spending time on a megabyte of keystrokes.
+    await panel.locator('#draft').evaluate(el => { el.value = '"' + 'x'.repeat(1024 * 1024) + '"'; el.dispatchEvent(new Event('input')); });
+    await panel.locator('#format-json').click();
+    assert.match(await panel.locator('#json-error').textContent(), /1MB/);
+    assert.equal(await panel.locator('#json-error-location').isVisible(), false);
+    await panel.locator('#draft').fill('[true, false, null]');
+    await panel.locator('#format-json').click();
+    assert.equal(await panel.locator('#json-error').isVisible(), false);
+    assert.equal(await panel.locator('#json-output').textContent(), '[\n  true,\n  false,\n  null\n]');
+  } finally { await app.close(); }
+});

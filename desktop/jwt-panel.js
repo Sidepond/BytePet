@@ -1,6 +1,6 @@
 import { decodeJwt, expirationStatus } from './jwt.js';
 
-export function setupJwtPanel(draft) {
+export function setupJwtPanel(draft, beforeDecode = () => {}) {
   const result = document.querySelector('#jwt-result');
   const error = document.querySelector('#jwt-error');
   const output = document.querySelector('#jwt-output');
@@ -22,6 +22,7 @@ export function setupJwtPanel(draft) {
     header.textContent = payload.textContent = signature.textContent = expiration.textContent = error.textContent = '';
   }
   document.querySelector('#decode-jwt').addEventListener('click', () => {
+    beforeDecode();
     clear();
     result.hidden = false;
     try {
