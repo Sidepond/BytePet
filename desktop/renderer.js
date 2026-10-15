@@ -1,6 +1,8 @@
 import { drawCat } from './cat.js';
+import { enableDragging } from './drag.js';
 
 const canvas = document.querySelector('#pet');
+enableDragging(canvas, window.petDrag);
 const ctx = canvas.getContext('2d');
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const startedAt = performance.now();

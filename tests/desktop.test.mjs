@@ -1,15 +1,38 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, writeFile, rm, realpath } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { _electron as electron } from 'playwright';
+import { getInitialBounds } from '../desktop/window.cjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 
-test('F01: native transparent pet, idle playback, reduced motion, and clean exit', { timeout: 30000 }, async () => {
+async function profileFor(t) {
+  const profile = await realpath(await mkdtemp(path.join(tmpdir(), 'bytepet-desktop-')));
+  t.after(() => rm(profile, { recursive: true, force: true }));
+  return profile;
+}
+
+async function launch(profile) {
   const env = { ...process.env };
   delete env.ELECTRON_RUN_AS_NODE;
-  const app = await electron.launch({ args: [root], cwd: root, env });
+  return electron.launch({ args: [root, `--user-data-dir=${profile}`], cwd: root, env });
+}
+
+const bounds = app => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getBounds());
+
+async function waitUntil(check) {
+  const deadline = Date.now() + 5000;
+  while (!(await check())) {
+    if (Date.now() > deadline) assert.fail('Timed out waiting for desktop state');
+    await new Promise(resolve => setTimeout(resolve, 25));
+  }
+}
+
+test('F01: native transparent pet, idle playback, reduced motion, and clean exit', { timeout: 30000 }, async t => {
+  const app = await launch(await profileFor(t));
   try {
     const page = await app.firstWindow();
     const errors = [];
@@ -97,6 +120,137 @@ test('F01: native transparent pet, idle playback, reduced motion, and clean exit
     const exited = app.waitForEvent('close');
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].close());
     await exited;
+  } finally {
+    await app.close();
+  }
+});
+
+test('F02: pointer drag saves position and restores it after restarting', { timeout: 30000 }, async t => {
+  const profile = await profileFor(t);
+  let app = await launch(profile);
+  try {
+    const page = await app.firstWindow();
+    await page.waitForLoadState('load');
+    assert.equal(await app.evaluate(({ app }) => app.getPath('userData')), profile);
+    const before = await bounds(app);
+    // A click or a small hand tremor must not become a drag.
+    await page.mouse.move(64, 64);
+    await page.mouse.down();
+    await page.mouse.move(65, 65);
+    await page.mouse.up();
+    assert.deepEqual(await bounds(app), before);
+    // The transparent margin is not a drag handle.
+    await page.mouse.move(4, 4);
+    await page.mouse.down();
+    await page.mouse.move(10, 10);
+    await page.mouse.up();
+    assert.deepEqual(await bounds(app), before);
+
+    await page.mouse.move(64, 64);
+    await page.mouse.down();
+    await page.mouse.move(24, 24);
+    await waitUntil(async () => (await bounds(app)).x < before.x);
+    await page.mouse.up();
+    await page.waitForFunction(() => !document.querySelector('canvas').classList.contains('dragging'));
+    let moved;
+    await waitUntil(async () => {
+      moved = await bounds(app);
+      try {
+        const saved = JSON.parse(await readFile(path.join(profile, 'pet-position.json'), 'utf8'));
+        return saved.x === moved.x && saved.y === moved.y;
+      } catch { return false; }
+    });
+    assert.ok(moved.x < before.x && moved.y < before.y);
+    assert.equal(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isAlwaysOnTop()), true);
+    await app.close();
+    app = await launch(profile);
+    await app.firstWindow();
+    assert.deepEqual(await bounds(app), moved);
+  } finally {
+    await app.close();
+  }
+});
+
+test('F02: corrupt saved state falls back, display changes recover visibility, close flushes position', { timeout: 30000 }, async t => {
+  const profile = await profileFor(t);
+  const file = path.join(profile, 'pet-position.json');
+  await writeFile(file, '{broken');
+  let app = await launch(profile);
+  try {
+    await app.firstWindow();
+    const area = await app.evaluate(({ screen }) => screen.getPrimaryDisplay().workArea);
+    assert.deepEqual(await bounds(app), getInitialBounds(area));
+    // Simulate a work-area change while running; the real handler must relocate.
+    const recovered = await app.evaluate(({ BrowserWindow, screen }) => {
+      const win = BrowserWindow.getAllWindows()[0];
+      const area = screen.getPrimaryDisplay().workArea;
+      const original = screen.getAllDisplays;
+      try {
+        screen.getAllDisplays = () => [{ workArea: { x: area.x + 20, y: area.y + 20, width: 300, height: 300 } }];
+        screen.emit('display-metrics-changed', {}, {}, ['workArea']);
+        return win.getBounds();
+      } finally {
+        screen.getAllDisplays = original;
+      }
+    });
+    assert.ok(recovered.x >= area.x + 20 && recovered.x + 128 <= area.x + 320);
+    assert.ok(recovered.y >= area.y + 20 && recovered.y + 128 <= area.y + 320);
+    const final = { x: area.x + 70, y: area.y + 80 };
+    const exited = app.waitForEvent('close');
+    await app.evaluate(({ BrowserWindow }, point) => {
+      const win = BrowserWindow.getAllWindows()[0];
+      win.setPosition(point.x, point.y);
+      win.close(); // No time for the debounced save.
+    }, final);
+    await exited;
+    assert.deepEqual(JSON.parse(await readFile(file, 'utf8')), { version: 1, ...final });
+    await app.close();
+    await writeFile(file, JSON.stringify({ version: 1, x: -900000, y: -900000 }));
+    app = await launch(profile);
+    await app.firstWindow();
+    const restored = await bounds(app);
+    const areas = await app.evaluate(({ screen }) => screen.getAllDisplays().map(display => display.workArea));
+    assert.ok(areas.some(a => restored.x >= a.x && restored.y >= a.y && restored.x + 128 <= a.x + a.width && restored.y + 128 <= a.y + a.height));
+  } finally {
+    await app.close();
+  }
+});
+
+test('F02: right-button gestures and lost capture do not leave a stuck drag', { timeout: 30000 }, async t => {
+  const app = await launch(await profileFor(t));
+  try {
+    const page = await app.firstWindow();
+    await page.waitForLoadState('load');
+    const before = await bounds(app);
+    // Keep the OS menu out of this gesture test; F01 retains the quit menu.
+    await page.evaluate(() => document.addEventListener('contextmenu', event => event.preventDefault()));
+    await page.mouse.move(64, 64);
+    await page.mouse.down({ button: 'right' });
+    await page.mouse.move(24, 24);
+    await page.mouse.up({ button: 'right' });
+    assert.deepEqual(await bounds(app), before);
+
+    await page.evaluate(() => document.querySelector('canvas').addEventListener('gotpointercapture', event => {
+      window.capturedPointer = event.pointerId;
+    }));
+    await page.mouse.move(64, 64);
+    await page.mouse.down();
+    // Travel outside the canvas: pointer capture must still move the pet.
+    await page.mouse.move(8, 8);
+    await waitUntil(async () => (await bounds(app)).x < before.x);
+    await page.evaluate(() => document.querySelector('canvas').releasePointerCapture(window.capturedPointer));
+    await page.mouse.move(10, 10);
+    await page.waitForFunction(() => !document.querySelector('canvas').classList.contains('dragging'));
+    const stopped = await bounds(app);
+    await page.mouse.move(12, 12);
+    await page.mouse.up();
+    assert.deepEqual(await bounds(app), stopped);
+    // A new gesture still works after cancellation.
+    await page.mouse.move(64, 64);
+    await page.mouse.down();
+    await page.mouse.move(40, 40);
+    await waitUntil(async () => (await bounds(app)).x < stopped.x);
+    await page.mouse.up();
   } finally {
     await app.close();
   }
