@@ -82,6 +82,7 @@ test('F01: native transparent pet, idle playback, reduced motion, and clean exit
       return {
         visible: win.isVisible(),
         topmost: win.isAlwaysOnTop(),
+        allWorkspaces: win.isVisibleOnAllWorkspaces(),
         resizable: win.isResizable(),
         background: win.getBackgroundColor(),
         cornerAlpha: capture.toBitmap()[3],
@@ -94,6 +95,7 @@ test('F01: native transparent pet, idle playback, reduced motion, and clean exit
     });
     assert.equal(native.visible, true);
     assert.equal(native.topmost, true);
+    if (process.platform === 'darwin') assert.equal(native.allWorkspaces, true);
     assert.equal(native.resizable, false);
     // Electron's getter omits alpha; inspect the native capture for transparency.
     assert.equal(native.background, '#000000');
@@ -409,9 +411,11 @@ test('F04: pet click toggles a focused panel, text survives hiding, and drag nev
     const safety = await app.evaluate(({ BrowserWindow, screen }) => {
       const panel = BrowserWindow.getAllWindows().find(win => win.getTitle() === 'BytePet 유틸리티');
       return { bounds: panel.getBounds(), area: screen.getDisplayMatching(panel.getBounds()).workArea,
+        allWorkspaces: panel.isVisibleOnAllWorkspaces(),
         parent: panel.getParentWindow().getTitle(), prefs: panel.webContents.getLastWebPreferences() };
     });
     assert.equal(safety.parent, 'BytePet');
+    if (process.platform === 'darwin') assert.equal(safety.allWorkspaces, true);
     assert.equal(safety.prefs.nodeIntegration, false);
     assert.equal(safety.prefs.contextIsolation, true);
     assert.equal(safety.prefs.sandbox, true);
@@ -428,6 +432,10 @@ test('F04: pet click toggles a focused panel, text survives hiding, and drag nev
     await panel.waitForFunction(() => document.activeElement?.id === 'draft');
     assert.equal(await panel.locator('#draft').inputValue(), 'F04 focus check');
     assert.equal(app.windows().length, 2, 'reopening reuses the panel');
+    if (process.platform === 'darwin') {
+      assert.equal(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
+        .every(win => win.isVisibleOnAllWorkspaces())), true, 'pet and reopened panel stay on every Space');
+    }
     await panel.keyboard.press('Escape');
     await waitUntil(async () => !(await panelVisible()));
     await pet.locator('canvas').focus();

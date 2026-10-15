@@ -55,6 +55,8 @@ function createPetWindow() {
     },
   });
   win.setAlwaysOnTop(true, 'floating');
+  // Configure once: repeating this on show would briefly hide macOS windows.
+  if (process.platform === 'darwin') win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   win.once('ready-to-show', () => win.showInactive());
   let drag;
   let saveTimer;

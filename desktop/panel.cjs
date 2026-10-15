@@ -85,6 +85,8 @@ function createUtilityPanel(pet, { appearanceStore, appearanceInitial, applyAppe
     });
     panel = win;
     win.setAlwaysOnTop(true, 'floating');
+    // Child windows need the same Space policy as the pet, including fullscreen.
+    if (process.platform === 'darwin') win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
     win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     win.webContents.on('will-navigate', event => event.preventDefault());
     win.once('ready-to-show', () => { ready = true; show(); });
