@@ -21,7 +21,7 @@ export function setupJwtPanel(draft, beforeDecode = () => {}) {
     result.hidden = true;
     header.textContent = payload.textContent = signature.textContent = expiration.textContent = error.textContent = '';
   }
-  document.querySelector('#decode-jwt').addEventListener('click', () => {
+  function run() {
     beforeDecode();
     clear();
     result.hidden = false;
@@ -43,11 +43,11 @@ export function setupJwtPanel(draft, beforeDecode = () => {}) {
     }
     result.focus({ preventScroll: true });
     result.scrollIntoView({ block: 'nearest' });
-  });
+  }
   draft.addEventListener('input', clear);
   document.querySelector('#close-jwt').addEventListener('click', () => { clear(); draft.focus(); });
   // Refresh against the system clock even while an unchanged result stays open.
   const timer = setInterval(updateExpiration, 1000);
   window.addEventListener('pagehide', () => clearInterval(timer), { once: true });
-  return clear;
+  return { clear, run };
 }

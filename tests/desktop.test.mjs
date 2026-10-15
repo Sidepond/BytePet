@@ -44,6 +44,11 @@ async function waitUntil(check) {
   }
 }
 
+async function runTool(panel, format) {
+  await panel.locator('#input-format').selectOption(format);
+  await panel.locator('#run-tool').click();
+}
+
 test('F01: native transparent pet, idle playback, reduced motion, and clean exit', { timeout: 30000 }, async t => {
   const app = await launch(await profileFor(t));
   try {
@@ -417,6 +422,10 @@ test('F04: pet click toggles a focused panel, text survives hiding, and drag nev
 
 test('F04: rapid toggles, panel following, and pet shutdown do not leave an orphan window', { timeout: 30000 }, async t => {
   const app = await launch(await profileFor(t));
+  let mainLog = '';
+  app.process().stderr.on('data', data => { mainLog += data.toString(); });
+  // Capture shutdown errors rather than hanging behind Electron's native error dialog.
+  await app.evaluate(() => { process.on('uncaughtException', error => process.stderr.write('BYTEPET_UNCAUGHT: ' + error.stack + '\n')); });
   try {
     const pet = await app.firstWindow();
     await pet.waitForLoadState('load');
@@ -447,6 +456,7 @@ test('F04: rapid toggles, panel following, and pet shutdown do not leave an orph
     const exited = app.waitForEvent('close');
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(win => win.getTitle() === 'BytePet').close());
     await exited;
+    assert.doesNotMatch(mainLog, /BYTEPET_UNCAUGHT:/, 'closing the pet and child panel must not throw');
   } finally {
     await app.close();
   }
@@ -586,7 +596,7 @@ test('F06: local JWT inspection, safe rendering, shelf restore, and stale-result
     const payload = { sub: '고양이 🐱', role: 'developer', exp: 4102444800, note: '<img src=x onerror="window.injected=true">' };
     const token = jwtToken(payload);
     await panel.locator('#draft').fill(`Bearer ${token}`);
-    await panel.locator('#decode-jwt').click();
+    await runTool(panel, 'jwt');
     assert.deepEqual(JSON.parse(await panel.locator('#jwt-header').textContent()), { alg: 'HS256', typ: 'JWT' });
     assert.deepEqual(JSON.parse(await panel.locator('#jwt-payload').textContent()), payload);
     assert.match(await panel.locator('#jwt-signature').textContent(), /서명 미검증/);
@@ -606,7 +616,7 @@ test('F06: local JWT inspection, safe rendering, shelf restore, and stale-result
     await panel.waitForFunction(() => document.querySelector('#draft').value === '');
     await panel.getByRole('button', { name: '텍스트 불러오기' }).click();
     assert.equal(await panel.locator('#draft').inputValue(), `Bearer ${token}`);
-    await panel.locator('#decode-jwt').click();
+    await runTool(panel, 'jwt');
     assert.deepEqual(JSON.parse(await panel.locator('#jwt-payload').textContent()), payload);
     await panel.keyboard.press('Escape');
     await pet.evaluate(() => window.petPanel.toggle());
@@ -615,7 +625,7 @@ test('F06: local JWT inspection, safe rendering, shelf restore, and stale-result
     await panel.locator('#draft').fill('different input');
     assert.equal(await panel.locator('#jwt-result').isVisible(), false);
     assert.equal(await panel.locator('#jwt-payload').textContent(), '');
-    await panel.locator('#decode-jwt').click();
+    await runTool(panel, 'jwt');
     assert.match(await panel.locator('#jwt-error').textContent(), /Header.Payload.Signature/);
     await panel.getByRole('button', { name: '텍스트 불러오기' }).click();
     assert.equal(await panel.locator('#jwt-result').isVisible(), false, 'loading a stored draft clears an earlier result');
@@ -633,26 +643,26 @@ test('F06: invalid tokens, missing/invalid expiration, unsigned tokens, and live
       [jwtToken([], { alg: 'HS256' }), /JSON 객체/],
     ]) {
       await panel.locator('#draft').fill(input);
-      await panel.locator('#decode-jwt').click();
+      await runTool(panel, 'jwt');
       assert.match(await panel.locator('#jwt-error').textContent(), message);
       assert.equal(await panel.locator('#jwt-output').isVisible(), false);
       assert.equal(await panel.locator('#draft').inputValue(), input);
     }
     for (const [payload, state] of [[{}, 'missing'], [{ exp: '123' }, 'invalid'], [{ exp: 0 }, 'expired']]) {
       await panel.locator('#draft').fill(jwtToken(payload, { alg: 'none' }, ''));
-      await panel.locator('#decode-jwt').click();
+      await runTool(panel, 'jwt');
       assert.equal(await panel.locator('#jwt-expiration').getAttribute('data-state'), state);
       assert.match(await panel.locator('#jwt-signature').textContent(), /서명 없음/);
       assert.deepEqual(JSON.parse(await panel.locator('#jwt-payload').textContent()), payload);
       assert.equal(await panel.locator('#jwt-error').isVisible(), false);
     }
     await panel.locator('#draft').fill(jwtToken({ exp: Date.now() / 1000 + 2.5 }));
-    await panel.locator('#decode-jwt').click();
+    await runTool(panel, 'jwt');
     assert.equal(await panel.locator('#jwt-expiration').getAttribute('data-state'), 'unexpired');
     await panel.waitForFunction(() => document.querySelector('#jwt-expiration').dataset.state === 'expired');
     // A failed decode must remove all previous output, not leave a plausible old payload.
     await panel.locator('#draft').fill('broken');
-    await panel.locator('#decode-jwt').click();
+    await runTool(panel, 'jwt');
     assert.equal(await panel.locator('#jwt-payload').textContent(), '');
     assert.equal(await panel.locator('#jwt-output').isVisible(), false);
   } finally { await app.close(); }
@@ -668,7 +678,7 @@ test('F07: lossless local JSON formatting, shelf restore, and tool switching', {
     panel.on('request', request => { if (/^https?:/.test(request.url())) requests.push(request.url()); });
     const input = '{"name":"고양이 🐱","id":900719925474099312345,"tags":["pet","dev"],"html":"<img src=x onerror=alert(1)>"}';
     await panel.locator('#draft').fill(input);
-    await panel.locator('#format-json').click();
+    await runTool(panel, 'json');
     const formatted = await panel.locator('#json-output').textContent();
     assert.match(formatted, /\n  "name": "고양이 🐱",\n/);
     assert.match(formatted, /900719925474099312345/);
@@ -683,29 +693,29 @@ test('F07: lossless local JSON formatting, shelf restore, and tool switching', {
     await pet.evaluate(() => window.petPanel.toggle());
     await panel.waitForFunction(() => document.activeElement?.id === 'draft');
     assert.equal(await panel.locator('#json-output').textContent(), formatted);
-    await panel.locator('#decode-jwt').click();
+    await runTool(panel, 'jwt');
     assert.equal(await panel.locator('#json-result').isVisible(), false);
     assert.equal(await panel.locator('#jwt-error').isVisible(), true);
-    await panel.locator('#format-json').click();
+    await runTool(panel, 'json');
     assert.equal(await panel.locator('#jwt-result').isVisible(), false);
     assert.equal(await panel.locator('#json-output').textContent(), formatted);
     await panel.locator('#close-json').click();
     assert.equal(await panel.locator('#json-result').isVisible(), false);
     assert.equal(await panel.locator('#draft').inputValue(), input);
-    await panel.locator('#format-json').click();
+    await runTool(panel, 'json');
     await panel.locator('#feed-text').click();
     await panel.waitForFunction(() => document.querySelector('#draft').value === '');
     assert.equal(await panel.locator('#json-result').isVisible(), false);
     await panel.getByRole('button', { name: '텍스트 불러오기' }).click();
     assert.equal(await panel.locator('#draft').inputValue(), input);
-    await panel.locator('#format-json').click();
+    await runTool(panel, 'json');
     assert.equal(await panel.locator('#json-output').textContent(), formatted);
     await panel.getByRole('button', { name: '텍스트 불러오기' }).click();
     assert.equal(await panel.locator('#json-result').isVisible(), false);
-    await panel.locator('#format-json').click();
+    await runTool(panel, 'json');
     await panel.locator('#draft').fill('null');
     assert.equal(await panel.locator('#json-result').isVisible(), false);
-    await panel.locator('#format-json').click();
+    await runTool(panel, 'json');
     assert.equal(await panel.locator('#json-output').textContent(), 'null');
     assert.deepEqual(errors, []);
     assert.deepEqual(requests, []);
@@ -717,10 +727,10 @@ test('F07: JSON errors identify and select original positions, clear stale outpu
   try {
     const { panel } = await openPanel(app);
     await panel.locator('#draft').fill('{"valid":true}');
-    await panel.locator('#format-json').click();
+    await runTool(panel, 'json');
     const input = '{\n  "name": "고양이 🐱",\n  "items": [1, 2,]\n}';
     await panel.locator('#draft').fill(input);
-    await panel.locator('#format-json').click();
+    await runTool(panel, 'json');
     assert.match(await panel.locator('#json-error').textContent(), /3줄 18열.*쉼표/);
     assert.equal(await panel.locator('#json-output').textContent(), '');
     assert.equal(await panel.locator('#json-output').isVisible(), false);
@@ -732,26 +742,145 @@ test('F07: JSON errors identify and select original positions, clear stale outpu
     });
     const long = '[\n' + '  1,\n'.repeat(30) + ']';
     await panel.locator('#draft').fill(long);
-    await panel.locator('#format-json').click();
+    await runTool(panel, 'json');
     await panel.locator('#json-error-location').click();
     assert.equal(await panel.locator('#draft').evaluate(el => el.selectionStart), long.length - 1);
     await panel.waitForFunction(() => document.querySelector('#draft').scrollTop > 0);
     await panel.locator('#draft').fill('[1,');
-    await panel.locator('#format-json').click();
+    await runTool(panel, 'json');
     assert.match(await panel.locator('#json-error').textContent(), /1줄 4열.*끝났/);
     await panel.locator('#json-error-location').click();
     assert.equal(await panel.locator('#draft').evaluate(el => el.selectionStart), 3);
     await panel.locator('#draft').fill('['.repeat(129) + '0' + ']'.repeat(129));
-    await panel.locator('#format-json').click();
+    await runTool(panel, 'json');
     assert.match(await panel.locator('#json-error').textContent(), /128단계/);
     // Programmatic fill exercises the UI limit without spending time on a megabyte of keystrokes.
     await panel.locator('#draft').evaluate(el => { el.value = '"' + 'x'.repeat(1024 * 1024) + '"'; el.dispatchEvent(new Event('input')); });
-    await panel.locator('#format-json').click();
+    await runTool(panel, 'json');
     assert.match(await panel.locator('#json-error').textContent(), /1MB/);
     assert.equal(await panel.locator('#json-error-location').isVisible(), false);
     await panel.locator('#draft').fill('[true, false, null]');
-    await panel.locator('#format-json').click();
+    await runTool(panel, 'json');
     assert.equal(await panel.locator('#json-error').isVisible(), false);
     assert.equal(await panel.locator('#json-output').textContent(), '[\n  true,\n  false,\n  null\n]');
+  } finally { await app.close(); }
+});
+
+test('F08: automatic routing, explicit overrides, unknown input, and result clearing', { timeout: 30000 }, async t => {
+  const app = await launch(await profileFor(t));
+  try {
+    const { pet, panel } = await openPanel(app);
+    const mode = panel.locator('#input-format');
+    const run = panel.locator('#run-tool');
+    const hint = panel.locator('#format-hint');
+    assert.equal(await mode.inputValue(), 'auto');
+    assert.equal(await run.isDisabled(), true);
+    await panel.locator('#draft').fill('{"hello":"고양이 🐱"}');
+    assert.equal(await hint.getAttribute('data-format'), 'json');
+    assert.equal(await run.textContent(), 'JSON 정리');
+    assert.equal(await panel.locator('#json-result').isVisible(), false);
+    assert.equal((await panel.evaluate(() => window.food.list())).value.length, 0);
+    assert.notEqual(await pet.locator('canvas').getAttribute('data-state'), 'eating');
+    await run.click();
+    assert.match(await panel.locator('#json-output').textContent(), /고양이/);
+    await mode.selectOption('jwt');
+    assert.equal(await panel.locator('#json-result').isVisible(), false);
+    await run.click();
+    assert.equal(await panel.locator('#jwt-error').isVisible(), true);
+    await panel.locator('#draft').fill('[1,2]');
+    assert.equal(await mode.inputValue(), 'jwt', 'manual mode survives editing');
+    assert.equal(await run.textContent(), 'JWT 해독');
+    assert.equal(await panel.locator('#jwt-result').isVisible(), false);
+    await panel.keyboard.press('Escape');
+    await pet.evaluate(() => window.petPanel.toggle());
+    await panel.waitForFunction(() => document.activeElement?.id === 'draft');
+    assert.equal(await mode.inputValue(), 'jwt', 'manual mode survives hiding the panel');
+    await mode.selectOption('auto');
+    assert.equal(await hint.getAttribute('data-format'), 'json');
+    await run.click();
+    assert.equal(await panel.locator('#json-output').textContent(), '[\n  1,\n  2\n]');
+    const token = jwtToken({ sub: 'F08', exp: 4102444800 });
+    await panel.locator('#draft').fill(`Bearer ${token}`);
+    assert.equal(await hint.getAttribute('data-format'), 'jwt');
+    assert.equal(await panel.locator('#json-result').isVisible(), false);
+    await run.click();
+    assert.match(await panel.locator('#jwt-payload').textContent(), /F08/);
+    await panel.locator('#draft').fill('[1,]');
+    await run.click();
+    assert.match(await panel.locator('#json-error').textContent(), /쉼표/);
+    await panel.locator('#draft').fill('Bearer invalid');
+    await run.click();
+    assert.equal(await panel.locator('#jwt-error').isVisible(), true);
+    for (const text of ['ordinary note', 'photo.backup.png', 'https://example.com']) {
+      await panel.locator('#draft').fill(text);
+      assert.equal(await run.isDisabled(), true);
+      assert.match(await hint.textContent(), /직접 선택/);
+      assert.equal(await panel.locator('#jwt-result').isVisible(), false);
+    }
+    await mode.selectOption('json');
+    assert.equal(await run.isDisabled(), false);
+    await run.click();
+    assert.equal(await panel.locator('#json-error').isVisible(), true);
+    await mode.selectOption('auto');
+    await panel.locator('#draft').fill('');
+    assert.equal(await run.isDisabled(), true);
+    await panel.locator('#draft').evaluate(el => { el.value = '한'.repeat(400000); el.dispatchEvent(new Event('input')); });
+    assert.equal(await run.isDisabled(), true);
+    assert.match(await hint.textContent(), /1MB/);
+    await panel.locator('#draft').fill('{"name":"BytePet","features":["JWT","JSON"]}');
+    await mkdir(path.join(root, 'test-results'), { recursive: true });
+    await panel.screenshot({ path: `${root}/test-results/f08-auto.png` });
+  } finally { await app.close(); }
+});
+
+test('F08: shelf loading, paste, save reset, and composition update the selected tool', { timeout: 30000 }, async t => {
+  const app = await launch(await profileFor(t));
+  try {
+    const { panel } = await openPanel(app);
+    const errors = [];
+    panel.on('pageerror', error => errors.push(error.message));
+    const draft = panel.locator('#draft');
+    const run = panel.locator('#run-tool');
+    const hint = panel.locator('#format-hint');
+    await draft.fill('{"restored":true}');
+    await panel.locator('#feed-text').click();
+    await panel.waitForFunction(() => document.querySelector('#draft').value === '');
+    assert.equal(await run.isDisabled(), true);
+    assert.equal(await hint.getAttribute('data-format'), '');
+    await draft.fill(jwtToken({ sub: 'temporary' }));
+    assert.equal(await hint.getAttribute('data-format'), 'jwt');
+    await run.click();
+    await panel.getByRole('button', { name: '텍스트 불러오기' }).click();
+    assert.equal(await hint.getAttribute('data-format'), 'json');
+    assert.equal(await panel.locator('#jwt-result').isVisible(), false);
+    await run.click();
+    assert.equal(JSON.parse(await panel.locator('#json-output').textContent()).restored, true);
+    await draft.fill('');
+    await panel.locator('#close').focus();
+    await panel.evaluate(token => {
+      const data = new DataTransfer();
+      data.setData('text/plain', token);
+      document.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+    }, jwtToken({ sub: 'pasted' }));
+    assert.equal(await hint.getAttribute('data-format'), 'jwt');
+    assert.equal(await panel.locator('#json-result').isVisible(), false);
+    assert.equal(await draft.evaluate(el => document.activeElement === el), true);
+    await run.click();
+    assert.match(await panel.locator('#jwt-payload').textContent(), /pasted/);
+    await draft.evaluate(el => {
+      el.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+      el.value = '{"한글":"입력 중"}';
+      el.dispatchEvent(new InputEvent('input', { bubbles: true, isComposing: true }));
+    });
+    assert.equal(await run.isDisabled(), true);
+    assert.match(await hint.textContent(), /입력을 마치면/);
+    assert.equal(await panel.locator('#jwt-result').isVisible(), false);
+    await draft.evaluate(el => el.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true })));
+    assert.equal(await run.isDisabled(), false);
+    assert.equal(await hint.getAttribute('data-format'), 'json');
+    await run.click();
+    assert.match(await panel.locator('#json-output').textContent(), /입력 중/);
+    assert.equal((await panel.evaluate(() => window.food.list())).value.length, 1);
+    assert.deepEqual(errors, []);
   } finally { await app.close(); }
 });

@@ -22,9 +22,15 @@
         <input id="files" type="file" multiple hidden>
       </div>
       <div class="utility-actions" aria-label="텍스트 도구">
-        <button id="decode-jwt" type="button" aria-controls="jwt-result">JWT 해독</button>
-        <button id="format-json" type="button" aria-controls="json-result">JSON 정리</button>
+        <label for="input-format">입력 형식</label>
+        <select id="input-format" aria-describedby="format-hint">
+          <option value="auto">자동</option>
+          <option value="jwt">JWT</option>
+          <option value="json">JSON</option>
+        </select>
+        <button id="run-tool" type="button" aria-controls="jwt-result json-result" disabled>도구 실행</button>
       </div>
+      <p id="format-hint" role="status" aria-live="polite"></p>
       <p id="feed-status" role="status" aria-live="polite">먹인 내용은 이 컴퓨터에 저장됩니다.</p>
       <section id="jwt-result" aria-labelledby="jwt-title" tabindex="-1" hidden>
         <div class="shelf-header"><h2 id="jwt-title">JWT 해독 결과</h2><button id="close-jwt" type="button">결과 닫기</button></div>
@@ -51,7 +57,7 @@
         <ul id="food-list" aria-label="저장된 먹이"></ul>
         <p id="empty-shelf">아직 먹이가 없어요. 첫 먹이를 주세요!</p>
       </section>
-      <footer>자동 형식 선택, 포트 확인은 준비 중<kbd>Esc 닫기</kbd></footer>
+      <footer>결과 복사, 포트 확인은 준비 중<kbd>Esc 닫기</kbd></footer>
     </main>
     <script type="module" src="panel.js"></script>
   </body>

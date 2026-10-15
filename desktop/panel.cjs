@@ -10,7 +10,8 @@ function createUtilityPanel(pet) {
   const food = createFoodService(pet, () => panel);
 
   function publish() {
-    if (!pet.isDestroyed()) pet.webContents.send('pet:panel-state', open);
+    // The renderer can be destroyed before the native parent window closes.
+    if (!pet.isDestroyed() && !pet.webContents.isDestroyed()) pet.webContents.send('pet:panel-state', open);
   }
   function reposition() {
     if (!panel || panel.isDestroyed()) return;

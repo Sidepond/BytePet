@@ -12,7 +12,7 @@ export function setupJsonPanel(draft, beforeFormat) {
     jump.hidden = true;
     errorOffset = null;
   }
-  document.querySelector('#format-json').addEventListener('click', () => {
+  function run() {
     beforeFormat();
     clear();
     result.hidden = false;
@@ -31,7 +31,7 @@ export function setupJsonPanel(draft, beforeFormat) {
     }
     result.focus({ preventScroll: true });
     result.scrollIntoView({ block: 'nearest' });
-  });
+  }
   jump.addEventListener('click', () => {
     if (errorOffset === null) return;
     const width = draft.value.codePointAt(errorOffset) > 0xffff ? 2 : 1;
@@ -40,5 +40,5 @@ export function setupJsonPanel(draft, beforeFormat) {
   });
   draft.addEventListener('input', clear);
   document.querySelector('#close-json').addEventListener('click', () => { clear(); draft.focus(); });
-  return clear;
+  return { clear, run };
 }

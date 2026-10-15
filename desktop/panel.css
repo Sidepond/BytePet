@@ -6,7 +6,7 @@ header { display: flex; justify-content: space-between; align-items: flex-start;
 .brand { margin: 0 0 5px; font-size: 10px; font-weight: 800; letter-spacing: 2px; }
 .brand span { color: #459b8f; font-size: 8px; }
 h1 { margin: 0; font-size: 20px; letter-spacing: -.6px; }
-button, textarea { font: inherit; }
+button, textarea, select { font: inherit; }
 #close { width: 30px; height: 30px; border: 1px solid #e7d9c6; border-radius: 7px; background: #fff; color: #53382f; font-size: 23px; cursor: pointer; }
 #close:hover { background: #ffedcf; }
 label { display: block; margin-bottom: 7px; font-size: 12px; font-weight: 700; }
@@ -17,7 +17,10 @@ textarea::placeholder { color: #867566; }
 footer { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 17px; color: #78685c; font-size: 10px; }
 kbd { border: 1px solid #dfd3c2; border-radius: 4px; padding: 2px 4px; background: #fffefb; }
 .feed-actions, .utility-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.utility-actions { margin-top: 8px; }
+.utility-actions { margin-top: 12px; align-items: center; }
+.utility-actions label { margin: 0; }
+.utility-actions select { min-width: 80px; border: 1px solid #d8c6ac; border-radius: 6px; padding: 6px; background: #fffefb; color: #53382f; font-size: 12px; }
+#format-hint { margin: 7px 0 0; font-size: 11px; line-height: 1.5; color: #78685c; overflow-wrap: anywhere; }
 .feed-actions button, .utility-actions button, #json-error-location, .shelf-header button, .item-actions button { border: 1px solid #d8c6ac; border-radius: 6px; padding: 7px 10px; background: #fffefb; color: #53382f; font-size: 12px; cursor: pointer; }
 #feed-text { background: #53382f; border-color: #53382f; color: #fffaf0; font-weight: 700; }
 button:disabled { cursor: default; opacity: .6; }
