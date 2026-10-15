@@ -8,6 +8,13 @@ const { createUtilityPanel } = require('./panel.cjs');
 const { createStatusTray } = require('./tray.cjs');
 
 app.setName('BytePet');
+// Keep development and packaged builds on the same data directory. Explicit
+// profiles (including desktop tests) remain isolated and keep their own lock.
+if (!app.commandLine.hasSwitch('user-data-dir')) {
+  app.setPath('userData', path.join(app.getPath('appData'), 'BytePet'));
+}
+const primaryInstance = app.requestSingleInstanceLock();
+if (!primaryInstance) app.quit();
 let petWindow;
 let petVisibility;
 let statusTray;
@@ -179,23 +186,30 @@ function createPetWindow() {
   return win;
 }
 
-app.whenReady().then(() => {
-  Menu.setApplicationMenu(Menu.buildFromTemplate([
-    { label: 'BytePet', submenu: [
-      { id: 'toggle-pet-visibility', label: '잠시 숨기기', click: toggleVisibility },
-      { type: 'separator' },
-      { label: 'BytePet 종료', role: 'quit', accelerator: 'CommandOrControl+Q' },
-    ] },
-    { label: '편집', submenu: [{ role: 'undo' }, { role: 'redo' }, { type: 'separator' }, { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }] },
-  ]));
-  createPetWindow();
-  statusTray = createStatusTray(toggleVisibility);
-  app.on('activate', () => {
-    if (!petWindow) createPetWindow();
-    else if (petVisibility.isHidden()) petVisibility.setHidden(false);
-    else petWindow.showInactive();
+function revealPet() {
+  // Activation can arrive during startup or shutdown. Window creation belongs
+  // only to the primary instance's ready handler, never to a relaunch event.
+  if (!petWindow || petWindow.isDestroyed()) return;
+  if (petVisibility.isHidden()) petVisibility.setHidden(false);
+  else petWindow.showInactive();
+}
+
+if (primaryInstance) {
+  app.on('second-instance', revealPet);
+  app.on('activate', revealPet);
+  app.whenReady().then(() => {
+    Menu.setApplicationMenu(Menu.buildFromTemplate([
+      { label: 'BytePet', submenu: [
+        { id: 'toggle-pet-visibility', label: '잠시 숨기기', click: toggleVisibility },
+        { type: 'separator' },
+        { label: 'BytePet 종료', role: 'quit', accelerator: 'CommandOrControl+Q' },
+      ] },
+      { label: '편집', submenu: [{ role: 'undo' }, { role: 'redo' }, { type: 'separator' }, { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }] },
+    ]));
+    createPetWindow();
+    statusTray = createStatusTray(toggleVisibility);
   });
-});
+}
 
 app.on('will-quit', () => {
   statusTray?.dispose();

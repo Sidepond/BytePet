@@ -1,5 +1,6 @@
 {
   "name": "bytepet",
+  "productName": "BytePet",
   "version": "0.1.0",
   "private": true,
   "description": "A pixel desktop pet for developers",
@@ -11,10 +12,13 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron .",
+    "package:mac": "node scripts/package-macos.mjs",
+    "test:package": "node --test tests/package.test.mjs",
     "test": "node --test tests/pet.test.mjs tests/food.test.mjs tests/jwt.test.mjs tests/json.test.mjs tests/format.test.mjs tests/results.test.mjs tests/ports.test.mjs tests/terminate.test.mjs tests/modules.test.mjs tests/appearance.test.mjs",
     "test:desktop": "node --test tests/desktop.test.mjs"
   },
   "devDependencies": {
+    "@electron/packager": "20.3.0",
     "electron": "44.7.2",
     "playwright": "1.64.1"
   }
