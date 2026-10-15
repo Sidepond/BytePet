@@ -10,3 +10,13 @@ contextBridge.exposeInMainWorld('petDrag', {
 contextBridge.exposeInMainWorld('petInput', {
   updateRegion: region => ipcRenderer.send('pet:hit-region', region),
 });
+
+contextBridge.exposeInMainWorld('petPanel', {
+  toggle: () => ipcRenderer.send('pet:panel-toggle'),
+  close: () => ipcRenderer.send('panel:close'),
+  onState: callback => {
+    const listener = (_event, open) => callback(open);
+    ipcRenderer.on('pet:panel-state', listener);
+    return () => ipcRenderer.removeListener('pet:panel-state', listener);
+  },
+});

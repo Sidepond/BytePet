@@ -33,4 +33,30 @@ function getVisibleBounds(position, workAreas, primaryWorkArea) {
   return closest;
 }
 
-module.exports = { getInitialBounds, getVisibleBounds, isPosition };
+function getPanelBounds(pet, area) {
+  const width = Math.min(360, area.width);
+  const height = Math.min(356, area.height);
+  const gap = 8;
+  const candidates = [
+    { x: pet.x + (pet.width - width) / 2, y: pet.y - height - gap },
+    { x: pet.x + (pet.width - width) / 2, y: pet.y + pet.height + gap },
+    { x: pet.x - width - gap, y: pet.y + (pet.height - height) / 2 },
+    { x: pet.x + pet.width + gap, y: pet.y + (pet.height - height) / 2 },
+  ];
+  let best;
+  let bestScore = Infinity;
+  for (const candidate of candidates) {
+    const x = Math.round(Math.max(area.x, Math.min(candidate.x, area.x + area.width - width)));
+    const y = Math.round(Math.max(area.y, Math.min(candidate.y, area.y + area.height - height)));
+    const overlap = Math.max(0, Math.min(x + width, pet.x + pet.width) - Math.max(x, pet.x)) *
+      Math.max(0, Math.min(y + height, pet.y + pet.height) - Math.max(y, pet.y));
+    const score = overlap * 1_000_000 + Math.abs(x - candidate.x) + Math.abs(y - candidate.y);
+    if (score < bestScore) {
+      best = { x, y, width, height };
+      bestScore = score;
+    }
+  }
+  return best;
+}
+
+module.exports = { getInitialBounds, getVisibleBounds, getPanelBounds, isPosition };

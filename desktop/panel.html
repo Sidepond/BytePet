@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'none'">
+    <title>BytePet 유틸리티</title>
+    <link rel="stylesheet" href="panel.css">
+  </head>
+  <body>
+    <main role="dialog" aria-modal="false" aria-labelledby="panel-title">
+      <header>
+        <div><p class="brand">BYTEPET <span>●</span></p><h1 id="panel-title">작은 작업 공간</h1></div>
+        <button id="close" type="button" aria-label="패널 닫기" title="닫기 (Esc)">×</button>
+      </header>
+      <label for="draft">작업 메모</label>
+      <textarea id="draft" spellcheck="false" placeholder="생각이나 텍스트를 잠시 적어두세요." aria-describedby="draft-hint"></textarea>
+      <p id="draft-hint">메모는 앱을 종료하면 지워집니다.</p>
+      <div class="tools" aria-label="준비 중인 유틸리티">
+        <button type="button" disabled>JWT 해독<span>준비 중</span></button>
+        <button type="button" disabled>JSON 정리<span>준비 중</span></button>
+        <button type="button" disabled>포트 확인<span>준비 중</span></button>
+      </div>
+      <footer>고양이를 다시 클릭해도 닫을 수 있어요.<kbd>Esc</kbd></footer>
+    </main>
+    <script type="module" src="panel.js"></script>
+  </body>
+</html>

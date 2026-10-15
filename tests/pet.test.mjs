@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { getInitialBounds, getVisibleBounds } from '../desktop/window.cjs';
+import { getInitialBounds, getVisibleBounds, getPanelBounds } from '../desktop/window.cjs';
 import { createPositionStore } from '../desktop/position-store.cjs';
 import { getIdlePose, CYCLE_MS } from '../desktop/cat.js';
 import { isHitRegion, hitsRegion } from '../desktop/input.cjs';
@@ -109,4 +109,21 @@ test('invalid or oversized hit regions from the renderer are rejected', () => {
     { ...hitRegion, alpha: [0, 255] }, { ...hitRegion, alpha: [0, 255, -1, 0] }]) {
     assert.equal(isHitRegion(region), false);
   }
+});
+
+test('panel remains on its display and avoids covering the pet near each edge', () => {
+  for (const area of [primary, secondary]) {
+    for (const offset of [{ x: 0, y: 0 }, { x: area.width - 128, y: 0 }, { x: 0, y: area.height - 128 }, { x: area.width - 128, y: area.height - 128 }]) {
+      const pet = { x: area.x + offset.x, y: area.y + offset.y, width: 128, height: 128 };
+      const panel = getPanelBounds(pet, area);
+      assert.ok(panel.x >= area.x && panel.y >= area.y);
+      assert.ok(panel.x + panel.width <= area.x + area.width && panel.y + panel.height <= area.y + area.height);
+      assert.ok(panel.x + panel.width <= pet.x || panel.x >= pet.x + pet.width || panel.y + panel.height <= pet.y || panel.y >= pet.y + pet.height);
+    }
+  }
+});
+
+test('panel fits a work area smaller than its preferred size', () => {
+  const area = { x: -200, y: 40, width: 300, height: 250 };
+  assert.deepEqual(getPanelBounds({ x: -100, y: 70, width: 128, height: 128 }, area), area);
 });

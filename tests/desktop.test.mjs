@@ -21,7 +21,7 @@ async function launch(profile) {
   return electron.launch({ args: [root, `--user-data-dir=${profile}`], cwd: root, env });
 }
 
-const bounds = app => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getBounds());
+const bounds = app => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(win => win.getTitle() === 'BytePet').getBounds());
 
 async function waitUntil(check) {
   const deadline = Date.now() + 5000;
@@ -44,7 +44,7 @@ test('F01: native transparent pet, idle playback, reduced motion, and clean exit
       return canvas && canvas.getContext('2d').getImageData(12, 10, 1, 1).data[3] > 0;
     });
     const native = await app.evaluate(async ({ BrowserWindow, screen, Menu }) => {
-      const win = BrowserWindow.getAllWindows()[0];
+      const win = BrowserWindow.getAllWindows().find(win => win.getTitle() === 'BytePet');
       const capture = await win.capturePage();
       return {
         visible: win.isVisible(),
@@ -101,7 +101,7 @@ test('F01: native transparent pet, idle playback, reduced motion, and clean exit
 
     // A normal foreground window must not demote the native pet window.
     await app.evaluate(async ({ BrowserWindow }) => {
-      const pet = BrowserWindow.getAllWindows()[0];
+      const pet = BrowserWindow.getAllWindows().find(win => win.getTitle() === 'BytePet');
       const other = new BrowserWindow({ width: 300, height: 200, show: false });
       await other.loadURL('data:text/html,<body>BytePet foreground test</body>');
       other.show();
@@ -118,7 +118,7 @@ test('F01: native transparent pet, idle playback, reduced motion, and clean exit
     assert.deepEqual(errors, []);
 
     const exited = app.waitForEvent('close');
-    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].close());
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(win => win.getTitle() === 'BytePet').close());
     await exited;
   } finally {
     await app.close();
@@ -139,6 +139,7 @@ test('F02: pointer drag saves position and restores it after restarting', { time
     await page.mouse.move(65, 65);
     await page.mouse.up();
     assert.deepEqual(await bounds(app), before);
+    await page.evaluate(() => window.petPanel.close());
     // The transparent margin is not a drag handle.
     await page.mouse.move(4, 4);
     await page.mouse.down();
@@ -161,7 +162,7 @@ test('F02: pointer drag saves position and restores it after restarting', { time
       } catch { return false; }
     });
     assert.ok(moved.x < before.x && moved.y < before.y);
-    assert.equal(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isAlwaysOnTop()), true);
+    assert.equal(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(win => win.getTitle() === 'BytePet').isAlwaysOnTop()), true);
     await app.close();
     app = await launch(profile);
     await app.firstWindow();
@@ -182,7 +183,7 @@ test('F02: corrupt saved state falls back, display changes recover visibility, c
     assert.deepEqual(await bounds(app), getInitialBounds(area));
     // Simulate a work-area change while running; the real handler must relocate.
     const recovered = await app.evaluate(({ BrowserWindow, screen }) => {
-      const win = BrowserWindow.getAllWindows()[0];
+      const win = BrowserWindow.getAllWindows().find(win => win.getTitle() === 'BytePet');
       const area = screen.getPrimaryDisplay().workArea;
       const original = screen.getAllDisplays;
       try {
@@ -198,7 +199,7 @@ test('F02: corrupt saved state falls back, display changes recover visibility, c
     const final = { x: area.x + 70, y: area.y + 80 };
     const exited = app.waitForEvent('close');
     await app.evaluate(({ BrowserWindow }, point) => {
-      const win = BrowserWindow.getAllWindows()[0];
+      const win = BrowserWindow.getAllWindows().find(win => win.getTitle() === 'BytePet');
       win.setPosition(point.x, point.y);
       win.close(); // No time for the debounced save.
     }, final);
@@ -265,7 +266,7 @@ test('F03: native input switches on visible pixels, follows animation, and stays
     // CDP mouse events bypass OS routing. Observe actual native API calls here;
     // a separate desktop check verifies clicks reaching the window underneath.
     await app.evaluate(({ BrowserWindow, screen }) => {
-      const win = BrowserWindow.getAllWindows()[0];
+      const win = BrowserWindow.getAllWindows().find(win => win.getTitle() === 'BytePet');
       const original = win.setIgnoreMouseEvents.bind(win);
       win.setIgnoreMouseEvents = (ignore, options) => {
         win.testIgnoring = ignore;
@@ -278,14 +279,14 @@ test('F03: native input switches on visible pixels, follows animation, and stays
         return { x: x + win.testCursor.x, y: y + win.testCursor.y };
       };
     });
-    const ignoring = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].testIgnoring);
+    const ignoring = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(win => win.getTitle() === 'BytePet').testIgnoring);
     const cursor = point => app.evaluate(({ BrowserWindow }, point) => {
-      BrowserWindow.getAllWindows()[0].testCursor = point;
+      BrowserWindow.getAllWindows().find(win => win.getTitle() === 'BytePet').testCursor = point;
     }, point);
     await waitUntil(async () => await ignoring() === false);
     await cursor({ x: 4, y: 4 });
     await waitUntil(async () => await ignoring() === true);
-    assert.equal(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].testForward), true);
+    assert.equal(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(win => win.getTitle() === 'BytePet').testForward), true);
     await cursor({ x: 20, y: 20 }); // Transparent pixel inside the canvas.
     await page.mouse.move(20, 20);
     const before = await bounds(app);
@@ -322,7 +323,7 @@ test('F03: native input switches on visible pixels, follows animation, and stays
 
     // Keep a menu interaction pinned until Electron's close callback fires.
     await app.evaluate(({ BrowserWindow, Menu }) => {
-      const win = BrowserWindow.getAllWindows()[0];
+      const win = BrowserWindow.getAllWindows().find(win => win.getTitle() === 'BytePet');
       Menu.prototype.popup = options => { win.testMenu = options; };
       win.webContents.emit('context-menu', {}, { x: 20, y: 20 });
       if (win.testMenu) throw new Error('Transparent pixels opened the pet menu');
@@ -333,8 +334,102 @@ test('F03: native input switches on visible pixels, follows animation, and stays
     // Allow at least one native cursor poll with the menu held open.
     await page.waitForTimeout(60);
     assert.equal(await ignoring(), false);
-    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].testMenu.callback());
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(win => win.getTitle() === 'BytePet').testMenu.callback());
     await waitUntil(async () => await ignoring() === true);
+  } finally {
+    await app.close();
+  }
+});
+
+test('F04: pet click toggles a focused panel, text survives hiding, and drag never opens it', { timeout: 30000 }, async t => {
+  const app = await launch(await profileFor(t));
+  try {
+    const pet = await app.firstWindow();
+    await pet.waitForLoadState('load');
+    const panelVisible = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().some(win => win.getTitle() === 'BytePet 유틸리티' && win.isVisible()));
+    await pet.mouse.click(20, 20);
+    assert.equal(await panelVisible(), false, 'transparent pixels cannot open a panel');
+    await pet.mouse.move(64, 64);
+    await pet.mouse.down();
+    await pet.mouse.move(40, 40);
+    await pet.mouse.up();
+    assert.equal(await panelVisible(), false, 'drag cannot open a panel');
+    const opened = app.waitForEvent('window');
+    await pet.mouse.click(64, 64);
+    const panel = await opened;
+    await panel.waitForLoadState('load');
+    await waitUntil(panelVisible);
+    await panel.waitForFunction(() => document.activeElement?.id === 'draft');
+    assert.equal(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getFocusedWindow()?.getTitle()), 'BytePet 유틸리티');
+    await panel.keyboard.type('F04 focus check');
+    assert.equal(await panel.locator('#draft').inputValue(), 'F04 focus check');
+    assert.equal(await pet.locator('canvas').getAttribute('aria-expanded'), 'true');
+    const safety = await app.evaluate(({ BrowserWindow, screen }) => {
+      const panel = BrowserWindow.getAllWindows().find(win => win.getTitle() === 'BytePet 유틸리티');
+      return { bounds: panel.getBounds(), area: screen.getDisplayMatching(panel.getBounds()).workArea,
+        parent: panel.getParentWindow().getTitle(), prefs: panel.webContents.getLastWebPreferences() };
+    });
+    assert.equal(safety.parent, 'BytePet');
+    assert.equal(safety.prefs.nodeIntegration, false);
+    assert.equal(safety.prefs.contextIsolation, true);
+    assert.equal(safety.prefs.sandbox, true);
+    assert.ok(safety.bounds.x >= safety.area.x && safety.bounds.y >= safety.area.y);
+    assert.ok(safety.bounds.x + safety.bounds.width <= safety.area.x + safety.area.width);
+    assert.ok(safety.bounds.y + safety.bounds.height <= safety.area.y + safety.area.height);
+    await panel.screenshot({ path: `${root}/test-results/f04-panel.png` });
+
+    await pet.mouse.click(64, 64);
+    await waitUntil(async () => !(await panelVisible()));
+    await pet.waitForFunction(() => document.querySelector('canvas').getAttribute('aria-expanded') === 'false');
+    await pet.mouse.click(64, 64);
+    await waitUntil(panelVisible);
+    await panel.waitForFunction(() => document.activeElement?.id === 'draft');
+    assert.equal(await panel.locator('#draft').inputValue(), 'F04 focus check');
+    assert.equal(app.windows().length, 2, 'reopening reuses the panel');
+    await panel.keyboard.press('Escape');
+    await waitUntil(async () => !(await panelVisible()));
+    await pet.locator('canvas').focus();
+    await pet.keyboard.press('Enter');
+    await waitUntil(panelVisible);
+    await panel.getByRole('button', { name: '패널 닫기', exact: true }).click();
+    await waitUntil(async () => !(await panelVisible()));
+  } finally {
+    await app.close();
+  }
+});
+
+test('F04: rapid toggles, panel following, and pet shutdown do not leave an orphan window', { timeout: 30000 }, async t => {
+  const app = await launch(await profileFor(t));
+  try {
+    const pet = await app.firstWindow();
+    await pet.waitForLoadState('load');
+    const opened = app.waitForEvent('window');
+    await pet.evaluate(() => { window.petPanel.toggle(); window.petPanel.toggle(); });
+    const panel = await opened;
+    await panel.waitForLoadState('load');
+    assert.equal(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(win => win.getTitle() === 'BytePet 유틸리티').isVisible()), false);
+    await pet.evaluate(() => window.petPanel.toggle());
+    await waitUntil(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(win => win.getTitle() === 'BytePet 유틸리티').isVisible()));
+    const placement = await app.evaluate(({ BrowserWindow, screen }) => {
+      const pet = BrowserWindow.getAllWindows().find(win => win.getTitle() === 'BytePet');
+      const area = screen.getPrimaryDisplay().workArea;
+      pet.setPosition(area.x + 40, area.y + 40);
+      return area;
+    });
+    await waitUntil(async () => {
+      const result = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(win => win.getTitle() === 'BytePet 유틸리티').getBounds());
+      const petX = placement.x + 40, petY = placement.y + 40;
+      const beside = result.x === petX + 128 + 8 || result.y === petY + 128 + 8;
+      return beside && result.x >= placement.x && result.y >= placement.y &&
+        result.x + result.width <= placement.x + placement.width && result.y + result.height <= placement.y + placement.height;
+    });
+    // Panel input remains available even when the pet itself is click-through.
+    await panel.locator('#draft').click();
+    await panel.keyboard.type('still editable');
+    assert.equal(await panel.locator('#draft').inputValue(), 'still editable');
+    const exited = app.waitForEvent('close');
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(win => win.getTitle() === 'BytePet').close());
+    await exited;
   } finally {
     await app.close();
   }

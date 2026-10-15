@@ -3,6 +3,7 @@ const path = require('node:path');
 const { getVisibleBounds, isPosition } = require('./window.cjs');
 const { createPositionStore } = require('./position-store.cjs');
 const { createPetInput } = require('./input.cjs');
+const { createUtilityPanel } = require('./panel.cjs');
 
 app.setName('BytePet');
 let petWindow;
@@ -19,6 +20,7 @@ function createPetWindow() {
     frame: false,
     hasShadow: false,
     alwaysOnTop: true,
+    acceptFirstMouse: true,
     resizable: false,
     maximizable: false,
     fullscreenable: false,
@@ -32,6 +34,7 @@ function createPetWindow() {
   });
   petWindow = win;
   const input = createPetInput(win, screen);
+  const panel = createUtilityPanel(win);
   win.setAlwaysOnTop(true, 'floating');
   win.once('ready-to-show', () => win.showInactive());
   let drag;
@@ -45,6 +48,7 @@ function createPetWindow() {
     const current = win.getBounds();
     const next = visibleBounds(current);
     if (current.x !== next.x || current.y !== next.y) win.setPosition(next.x, next.y);
+    panel.reposition();
     savePosition();
   }
   function handleDrag(event, action, point) {
@@ -80,6 +84,7 @@ function createPetWindow() {
   win.webContents.on('did-start-loading', resetInput);
   win.webContents.on('render-process-gone', resetInput);
   win.on('move', () => {
+    panel.reposition();
     clearTimeout(saveTimer);
     // Avoid disk writes for every pointer update; close also flushes immediately.
     saveTimer = setTimeout(savePosition, 250);
@@ -92,6 +97,7 @@ function createPetWindow() {
     ipcMain.removeListener('pet:drag', handleDrag);
     ipcMain.removeListener('pet:hit-region', handleHitRegion);
     input.dispose();
+    panel.dispose();
     for (const event of displayEvents) screen.removeListener(event, keepVisible);
     petWindow = null;
   });
@@ -118,6 +124,7 @@ function createPetWindow() {
 app.whenReady().then(() => {
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     { label: 'BytePet', submenu: [{ label: 'BytePet 종료', role: 'quit', accelerator: 'CommandOrControl+Q' }] },
+    { label: '편집', submenu: [{ role: 'undo' }, { role: 'redo' }, { type: 'separator' }, { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }] },
   ]));
   createPetWindow();
   app.on('activate', () => {

@@ -3,7 +3,14 @@ import { enableDragging } from './drag.js';
 import { isCanvasHit, createHitRegionReporter } from './hit-test.js';
 
 const canvas = document.querySelector('#pet');
-enableDragging(canvas, window.petDrag, event => isCanvasHit(canvas, event));
+enableDragging(canvas, window.petDrag, event => isCanvasHit(canvas, event), () => window.petPanel.toggle());
+window.petPanel.onState(open => canvas.setAttribute('aria-expanded', String(open)));
+canvas.addEventListener('keydown', event => {
+  if ((event.key === 'Enter' || event.key === ' ') && !event.repeat) {
+    event.preventDefault();
+    window.petPanel.toggle();
+  }
+});
 const reportHitRegion = createHitRegionReporter(canvas, window.petInput);
 const ctx = canvas.getContext('2d');
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');

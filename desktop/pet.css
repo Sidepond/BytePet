@@ -4,3 +4,4 @@ html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background:
 body { display: grid; place-items: center; user-select: none; }
 canvas { display: block; width: 96px; height: 96px; image-rendering: pixelated; cursor: grab; touch-action: none; }
 canvas.dragging { cursor: grabbing; }
+canvas:focus-visible { outline: 2px dashed #459b8f; outline-offset: -2px; }

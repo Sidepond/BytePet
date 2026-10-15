@@ -1,4 +1,4 @@
-export function enableDragging(canvas, bridge, canStart = () => true) {
+export function enableDragging(canvas, bridge, canStart = () => true, onActivate = () => {}) {
   let gesture;
 
   function finish() {
@@ -29,8 +29,10 @@ export function enableDragging(canvas, bridge, canStart = () => true) {
   });
   canvas.addEventListener('pointerup', event => {
     if (!gesture || event.pointerId !== gesture.pointerId || event.button !== 0) return;
+    const activate = !gesture.dragging && canStart(event) && Math.hypot(event.screenX - gesture.x, event.screenY - gesture.y) < 4;
     if (gesture.dragging) bridge.move(Math.round(event.screenX), Math.round(event.screenY));
     finish();
+    if (activate) onActivate();
   });
   canvas.addEventListener('pointercancel', finish);
   canvas.addEventListener('lostpointercapture', finish);
