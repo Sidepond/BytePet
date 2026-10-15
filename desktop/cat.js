@@ -126,3 +126,29 @@ export function drawEatingCat(ctx, elapsed) {
     ctx.fillRect(12, 13, 1, 1);
   }
 }
+
+export function drawResultCat(ctx, state, elapsed) {
+  if (state === 'success') {
+    drawEatingCat(ctx, 1500);
+    ctx.fillStyle = '#459b8f';
+    const y = Math.floor(elapsed / 200) % 2 ? 4 : 5;
+    ctx.fillRect(2, y, 1, 3);
+    ctx.fillRect(1, y + 1, 3, 1);
+    return;
+  }
+  drawCat(ctx, 0);
+  // Raised eyebrows, a small round mouth, and a blue question mark.
+  ctx.fillStyle = palette.o;
+  ctx.fillRect(8, 7, 2, 1);
+  ctx.fillRect(15, 8, 2, 1);
+  ctx.fillStyle = palette.c;
+  ctx.fillRect(10, 12, 5, 2);
+  ctx.fillStyle = palette.o;
+  ctx.fillRect(12, 12, 2, 2);
+  ctx.fillStyle = '#6a99b4';
+  const y = Math.floor(elapsed / 250) % 2 ? 1 : 2;
+  ctx.fillRect(20, y, 3, 1);
+  ctx.fillRect(22, y + 1, 1, 1);
+  ctx.fillRect(21, y + 2, 1, 1);
+  ctx.fillRect(21, y + 4, 1, 1);
+}

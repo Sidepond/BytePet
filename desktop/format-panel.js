@@ -31,7 +31,10 @@ export function setupFormatPanel(draft, tools, clearResults) {
   run.addEventListener('click', () => {
     // Re-read the current input at execution time; never route a stale detection.
     const selected = update();
-    if (selected && !composing) tools[selected].run();
+    if (selected && !composing) {
+      const success = tools[selected].run();
+      window.resultTools.react(success ? 'success' : 'failure');
+    }
   });
   update();
   return update;

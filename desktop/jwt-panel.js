@@ -1,4 +1,5 @@
 import { decodeJwt, expirationStatus } from './jwt.js';
+import { setupResultCopy } from './result-copy.js';
 
 export function setupJwtPanel(draft, beforeDecode = () => {}) {
   const result = document.querySelector('#jwt-result');
@@ -9,6 +10,11 @@ export function setupJwtPanel(draft, beforeDecode = () => {}) {
   const signature = document.querySelector('#jwt-signature');
   const expiration = document.querySelector('#jwt-expiration');
   let decoded = null;
+  const setCopyAvailable = setupResultCopy('#jwt-copy-status', [
+    ['#copy-jwt-header', () => header.textContent],
+    ['#copy-jwt-payload', () => payload.textContent],
+    ['#copy-jwt-all', () => JSON.stringify({ header: decoded.header, payload: decoded.payload }, null, 2)],
+  ]);
 
   function updateExpiration() {
     if (!decoded) return;
@@ -17,6 +23,7 @@ export function setupJwtPanel(draft, beforeDecode = () => {}) {
     expiration.dataset.state = status.state;
   }
   function clear() {
+    setCopyAvailable(false);
     decoded = null;
     result.hidden = true;
     header.textContent = payload.textContent = signature.textContent = expiration.textContent = error.textContent = '';
@@ -35,6 +42,7 @@ export function setupJwtPanel(draft, beforeDecode = () => {}) {
       updateExpiration();
       output.hidden = false;
       error.hidden = true;
+      setCopyAvailable(true);
     } catch (cause) {
       decoded = null;
       output.hidden = true;
@@ -43,6 +51,7 @@ export function setupJwtPanel(draft, beforeDecode = () => {}) {
     }
     result.focus({ preventScroll: true });
     result.scrollIntoView({ block: 'nearest' });
+    return decoded !== null;
   }
   draft.addEventListener('input', clear);
   document.querySelector('#close-jwt').addEventListener('click', () => { clear(); draft.focus(); });

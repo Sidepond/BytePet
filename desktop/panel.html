@@ -43,7 +43,13 @@
           <pre id="jwt-header" tabindex="0" aria-labelledby="jwt-header-title"></pre>
           <h3 id="jwt-payload-title">Payload</h3>
           <pre id="jwt-payload" tabindex="0" aria-labelledby="jwt-payload-title"></pre>
+          <div class="copy-actions">
+            <button id="copy-jwt-header" type="button" disabled>Header 복사</button>
+            <button id="copy-jwt-payload" type="button" disabled>Payload 복사</button>
+            <button id="copy-jwt-all" type="button" disabled>전체 복사</button>
+          </div>
         </div>
+        <p id="jwt-copy-status" class="copy-status" role="status" aria-live="polite"></p>
       </section>
       <section id="json-result" aria-labelledby="json-title" tabindex="-1" hidden>
         <div class="shelf-header"><h2 id="json-title">JSON 정리 결과</h2><button id="close-json" type="button">결과 닫기</button></div>
@@ -51,13 +57,15 @@
         <p id="json-error" role="alert" hidden></p>
         <button id="json-error-location" type="button" hidden>오류 위치로 이동</button>
         <pre id="json-output" tabindex="0" aria-labelledby="json-title" hidden></pre>
+        <div class="copy-actions"><button id="copy-json" type="button" disabled>결과 복사</button></div>
+        <p id="json-copy-status" class="copy-status" role="status" aria-live="polite"></p>
       </section>
       <section aria-labelledby="shelf-title">
         <div class="shelf-header"><h2 id="shelf-title">보관함</h2><button id="open-folder" type="button">폴더 열기</button></div>
         <ul id="food-list" aria-label="저장된 먹이"></ul>
         <p id="empty-shelf">아직 먹이가 없어요. 첫 먹이를 주세요!</p>
       </section>
-      <footer>결과 복사, 포트 확인은 준비 중<kbd>Esc 닫기</kbd></footer>
+      <footer>포트 확인은 준비 중<kbd>Esc 닫기</kbd></footer>
     </main>
     <script type="module" src="panel.js"></script>
   </body>

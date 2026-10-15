@@ -1,13 +1,15 @@
-const { BrowserWindow, ipcMain, screen } = require('electron');
+const { BrowserWindow, ipcMain, screen, clipboard } = require('electron');
 const path = require('node:path');
 const { getPanelBounds } = require('./window.cjs');
 const { createFoodService } = require('./food.cjs');
+const { createResultService } = require('./results.cjs');
 
 function createUtilityPanel(pet) {
   let panel;
   let open = false;
   let ready = false;
   const food = createFoodService(pet, () => panel);
+  const results = createResultService({ ipcMain, clipboard, pet, getPanel: () => panel });
 
   function publish() {
     // The renderer can be destroyed before the native parent window closes.
@@ -76,6 +78,7 @@ function createUtilityPanel(pet) {
     reposition,
     dispose() {
       food.dispose();
+      results.dispose();
       ipcMain.removeListener('pet:panel-toggle', toggle);
       ipcMain.removeListener('panel:close', close);
       if (panel && !panel.isDestroyed()) panel.destroy();

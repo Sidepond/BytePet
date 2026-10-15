@@ -1,4 +1,5 @@
 import { formatJson, JsonFormatError } from './json.js';
+import { setupResultCopy } from './result-copy.js';
 
 export function setupJsonPanel(draft, beforeFormat) {
   const result = document.querySelector('#json-result');
@@ -6,7 +7,9 @@ export function setupJsonPanel(draft, beforeFormat) {
   const output = document.querySelector('#json-output');
   const jump = document.querySelector('#json-error-location');
   let errorOffset = null;
+  const setCopyAvailable = setupResultCopy('#json-copy-status', [['#copy-json', () => output.textContent]]);
   function clear() {
+    setCopyAvailable(false);
     result.hidden = true;
     error.textContent = output.textContent = '';
     jump.hidden = true;
@@ -21,6 +24,7 @@ export function setupJsonPanel(draft, beforeFormat) {
     try {
       output.textContent = formatJson(draft.value);
       output.hidden = false;
+      setCopyAvailable(true);
     } catch (cause) {
       error.hidden = false;
       if (cause instanceof JsonFormatError) {
@@ -31,6 +35,7 @@ export function setupJsonPanel(draft, beforeFormat) {
     }
     result.focus({ preventScroll: true });
     result.scrollIntoView({ block: 'nearest' });
+    return !output.hidden;
   }
   jump.addEventListener('click', () => {
     if (errorOffset === null) return;

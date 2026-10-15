@@ -884,3 +884,135 @@ test('F08: shelf loading, paste, save reset, and composition update the selected
     assert.deepEqual(errors, []);
   } finally { await app.close(); }
 });
+
+test('F09: JSON and JWT buttons copy exact results to the native clipboard only on request', { timeout: 30000 }, async t => {
+  const app = await launch(await profileFor(t));
+  try {
+    const { pet, panel } = await openPanel(app);
+    // Keep all original clipboard formats inside the test process, never in test output.
+    await app.evaluate(async ({ clipboard, ClipboardItem }) => {
+      const snapshot = await clipboard.read();
+      globalThis.clipboardSnapshot = await Promise.all(snapshot.filter(item => item.types.length).map(async item => new ClipboardItem(
+        Object.fromEntries(await Promise.all(item.types.map(async type => [type, await item.getType(type)]))),
+      )));
+      globalThis.copyWrites = [];
+      const write = clipboard.writeText.bind(clipboard);
+      clipboard.writeText = async text => { await write(text); globalThis.copyWrites.push(text); };
+    });
+    const input = '{"id":900719925474099312345,"name":"고양이 🐱"}';
+    await panel.locator('#draft').fill(input);
+    await panel.locator('#run-tool').click();
+    assert.deepEqual(await app.evaluate(() => globalThis.copyWrites), []);
+    const expected = await panel.locator('#json-output').textContent();
+    await panel.locator('#copy-json').click();
+    await panel.waitForFunction(() => document.querySelector('#json-copy-status').textContent.includes('복사했어요'));
+    assert.equal(await app.evaluate(async ({ clipboard }) => await clipboard.readText()), expected);
+    assert.match(expected, /900719925474099312345/);
+    assert.equal(await panel.locator('#draft').inputValue(), input);
+    assert.equal((await panel.evaluate(() => window.food.list())).value.length, 0);
+    await panel.screenshot({ path: `${root}/test-results/f09-copy.png` });
+    const payload = { sub: '복사 테스트', exp: 4102444800 };
+    await panel.locator('#draft').fill(jwtToken(payload));
+    await panel.locator('#run-tool').click();
+    const header = JSON.parse(await panel.locator('#jwt-header').textContent());
+    for (const [selector, value] of [['#copy-jwt-header', header], ['#copy-jwt-payload', payload], ['#copy-jwt-all', { header, payload }]]) {
+      await panel.locator(selector).click();
+      await panel.waitForFunction(() => document.querySelector('#jwt-copy-status').textContent.includes('복사했어요'));
+      assert.equal(await app.evaluate(async ({ clipboard }) => await clipboard.readText()), JSON.stringify(value, null, 2));
+    }
+    assert.equal((await app.evaluate(() => globalThis.copyWrites)).length, 4);
+    await panel.locator('#draft').fill('Bearer broken');
+    assert.equal(await panel.locator('#copy-jwt-header').isDisabled(), true);
+    await panel.locator('#run-tool').click();
+    assert.equal(await panel.locator('#copy-jwt-all').isDisabled(), true);
+    assert.equal((await app.evaluate(() => globalThis.copyWrites)).length, 4);
+    assert.equal((await pet.evaluate(() => window.resultTools.copy('unauthorized'))).ok, false);
+  } finally {
+    // Restore only if the clipboard still holds our last write; respect a newer user copy.
+    await app.evaluate(async ({ clipboard }) => {
+      const last = globalThis.copyWrites?.at(-1);
+      if (last !== undefined && await clipboard.readText() === last) {
+        if (globalThis.clipboardSnapshot.length) await clipboard.write(globalThis.clipboardSnapshot);
+        else clipboard.clear();
+      }
+    });
+    await app.close();
+  }
+});
+
+test('F09: copy failures and late responses preserve current results and permit retry', { timeout: 30000 }, async t => {
+  const app = await launch(await profileFor(t));
+  try {
+    const { panel } = await openPanel(app);
+    await app.evaluate(({ clipboard }) => { clipboard.writeText = async () => { throw new Error('mock clipboard failure'); }; });
+    await panel.locator('#draft').fill('{"keep":true}');
+    await panel.locator('#run-tool').click();
+    const expected = await panel.locator('#json-output').textContent();
+    await panel.locator('#copy-json').click();
+    await panel.waitForFunction(() => document.querySelector('#json-copy-status').classList.contains('error'));
+    assert.equal(await panel.locator('#json-output').textContent(), expected);
+    assert.equal(await panel.locator('#copy-json').isDisabled(), false);
+    await app.evaluate(({ clipboard }) => { clipboard.writeText = () => new Promise(resolve => { globalThis.finishCopy = resolve; }); });
+    await panel.locator('#copy-json').click();
+    assert.equal(await panel.locator('#copy-json').isDisabled(), true);
+    await waitUntil(() => app.evaluate(() => typeof globalThis.finishCopy === 'function'));
+    await panel.locator('#draft').fill('null');
+    await panel.locator('#run-tool').click();
+    assert.equal(await panel.locator('#json-copy-status').textContent(), '');
+    await app.evaluate(() => globalThis.finishCopy());
+    await panel.waitForTimeout(100);
+    assert.equal(await panel.locator('#json-copy-status').textContent(), '', 'old completion must not label a new result copied');
+    assert.equal(await panel.locator('#json-output').textContent(), 'null');
+    await app.evaluate(({ clipboard }) => { clipboard.writeText = async text => { globalThis.retryCopy = text; }; });
+    await panel.locator('#copy-json').click();
+    await panel.waitForFunction(() => document.querySelector('#json-copy-status').textContent.includes('복사했어요'));
+    assert.equal(await app.evaluate(() => globalThis.retryCopy), 'null');
+    await panel.locator('#close-json').click();
+    assert.equal(await panel.locator('#copy-json').isDisabled(), true);
+  } finally { await app.close(); }
+});
+
+test('F09: chewing, success/failure, reduced motion, and newer feeding return to idle', { timeout: 30000 }, async t => {
+  const app = await launch(await profileFor(t));
+  try {
+    const { pet, panel } = await openPanel(app);
+    await pet.emulateMedia({ reducedMotion: 'no-preference' });
+    await panel.locator('#draft').fill('{"happy":true}');
+    await panel.locator('#run-tool').click();
+    await pet.waitForFunction(() => document.querySelector('canvas').dataset.state === 'processing');
+    const chew = await pet.locator('canvas').evaluate(canvas => canvas.toDataURL());
+    await pet.waitForFunction(frame => document.querySelector('canvas').toDataURL() !== frame, chew);
+    await pet.waitForFunction(() => document.querySelector('canvas').dataset.state === 'success');
+    await pet.screenshot({ path: `${root}/test-results/f09-success.png`, omitBackground: true });
+    await pet.waitForFunction(() => document.querySelector('canvas').dataset.state === 'idle');
+    await pet.emulateMedia({ reducedMotion: 'reduce' });
+    await panel.locator('#draft').fill('[1,]');
+    await panel.locator('#run-tool').click();
+    await pet.waitForFunction(() => document.querySelector('canvas').dataset.state === 'processing');
+    const still = await pet.locator('canvas').evaluate(canvas => canvas.toDataURL());
+    await pet.waitForTimeout(200);
+    assert.equal(await pet.locator('canvas').evaluate(canvas => canvas.toDataURL()), still);
+    await pet.waitForFunction(() => document.querySelector('canvas').dataset.state === 'failure');
+    const failure = await pet.locator('canvas').evaluate(canvas => canvas.toDataURL());
+    await pet.waitForTimeout(200);
+    assert.equal(await pet.locator('canvas').evaluate(canvas => canvas.toDataURL()), failure);
+    assert.notEqual(failure, still);
+    await pet.screenshot({ path: `${root}/test-results/f09-failure.png`, omitBackground: true });
+    await pet.waitForFunction(() => document.querySelector('canvas').dataset.state === 'idle');
+    // A newer save takes over the pet; the older conversion timers cannot reset it.
+    await panel.locator('#run-tool').click();
+    await pet.waitForFunction(() => document.querySelector('canvas').dataset.state === 'processing');
+    await panel.locator('#feed-text').click();
+    await pet.waitForFunction(() => document.querySelector('canvas').dataset.state === 'eating');
+    await pet.waitForTimeout(850);
+    assert.equal(await pet.locator('canvas').getAttribute('data-state'), 'eating');
+    await pet.waitForFunction(() => document.querySelector('canvas').dataset.state === 'idle');
+    await panel.locator('#draft').fill('null');
+    await panel.locator('#run-tool').click();
+    await pet.waitForFunction(() => document.querySelector('canvas').dataset.state === 'processing');
+    await panel.locator('#draft').fill('[bad]');
+    await panel.locator('#run-tool').click();
+    await pet.waitForFunction(() => document.querySelector('canvas').dataset.state === 'failure');
+    await pet.waitForFunction(() => document.querySelector('canvas').dataset.state === 'idle');
+  } finally { await app.close(); }
+});

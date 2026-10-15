@@ -1,6 +1,6 @@
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
-// Only pet input is exposed; the renderer cannot read or write files.
+// Narrow bridges only; the renderer has no unrestricted file or clipboard access.
 contextBridge.exposeInMainWorld('petDrag', {
   start: (x, y) => ipcRenderer.send('pet:drag', 'start', { x, y }),
   move: (x, y) => ipcRenderer.send('pet:drag', 'move', { x, y }),
@@ -27,6 +27,16 @@ contextBridge.exposeInMainWorld('utilityPanel', {
     const listener = () => callback();
     ipcRenderer.on('panel:opened', listener);
     return () => ipcRenderer.removeListener('panel:opened', listener);
+  },
+});
+
+contextBridge.exposeInMainWorld('resultTools', {
+  copy: text => ipcRenderer.invoke('results:copy', text),
+  react: outcome => ipcRenderer.send('results:react', outcome),
+  onReaction: callback => {
+    const listener = (_event, outcome) => callback(outcome);
+    ipcRenderer.on('results:reaction', listener);
+    return () => ipcRenderer.removeListener('results:reaction', listener);
   },
 });
 

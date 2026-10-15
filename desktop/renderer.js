@@ -1,4 +1,5 @@
-import { drawCat, drawEatingCat, EATING_MS } from './cat.js';
+import { drawCat, drawEatingCat, drawResultCat } from './cat.js';
+import { createReactionPlayer } from './reaction.js';
 import { enableDragging } from './drag.js';
 import { isCanvasHit, createHitRegionReporter } from './hit-test.js';
 import { enableFoodDrop, resultMessage } from './feeding.js';
@@ -17,11 +18,18 @@ const ctx = canvas.getContext('2d');
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const startedAt = performance.now();
 let timer;
-let eatingStarted = null;
-let eatingTimer;
+let reaction = { state: 'idle', startedAt: 0 };
 let messageTimer;
 let feeding = false;
 const message = document.querySelector('#pet-message');
+const reactions = createReactionPlayer(next => {
+  reaction = next;
+  canvas.dataset.state = next.state;
+  if (next.state === 'processing') showMessage('냠냠…');
+  if (next.state === 'success') showMessage('변환했어요!');
+  if (next.state === 'failure') showMessage('입력을 확인해 주세요');
+  updateAnimation();
+});
 function showMessage(text) {
   clearTimeout(messageTimer);
   message.textContent = text;
@@ -45,20 +53,16 @@ document.addEventListener('paste', event => {
   consume(() => files.length ? window.food.saveFiles(files) : window.food.saveText(text));
 });
 window.food.onSaved(({ count }) => {
-  eatingStarted = performance.now();
-  canvas.dataset.state = 'eating';
+  reactions.play('eating');
   showMessage(`냠냠! ${count}개 저장했어요`);
-  clearTimeout(eatingTimer);
-  eatingTimer = setTimeout(() => {
-    eatingStarted = null;
-    canvas.dataset.state = 'idle';
-    updateAnimation();
-  }, EATING_MS);
-  updateAnimation();
 });
+window.resultTools.onReaction(outcome => reactions.play(outcome));
 
 function render() {
-  if (eatingStarted !== null) drawEatingCat(ctx, reducedMotion.matches ? 1500 : performance.now() - eatingStarted);
+  const elapsed = performance.now() - reaction.startedAt;
+  if (reaction.state === 'eating') drawEatingCat(ctx, reducedMotion.matches ? 1500 : elapsed);
+  else if (reaction.state === 'processing') drawEatingCat(ctx, reducedMotion.matches ? 700 : 400 + elapsed % 900);
+  else if (reaction.state === 'success' || reaction.state === 'failure') drawResultCat(ctx, reaction.state, reducedMotion.matches ? 0 : elapsed);
   else drawCat(ctx, reducedMotion.matches ? 0 : performance.now() - startedAt);
   reportHitRegion();
 }
@@ -72,6 +76,6 @@ function updateAnimation() {
 
 reducedMotion.addEventListener('change', updateAnimation);
 document.addEventListener('visibilitychange', updateAnimation);
-window.addEventListener('pagehide', () => clearInterval(timer), { once: true });
+window.addEventListener('pagehide', () => { clearInterval(timer); clearTimeout(messageTimer); reactions.dispose(); }, { once: true });
 window.addEventListener('resize', reportHitRegion);
 updateAnimation();
