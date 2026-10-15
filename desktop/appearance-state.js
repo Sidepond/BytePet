@@ -1,4 +1,4 @@
-let state = { preferences: { ground: true, menuSide: 'left' }, revision: -1, warning: null };
+let state = { preferences: { ground: true, menuSide: 'left', character: 'cat-cheese' }, revision: -1, warning: null };
 const listeners = new Set();
 function apply(next) {
   if (next.revision <= state.revision) return;

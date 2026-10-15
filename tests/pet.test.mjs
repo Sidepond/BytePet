@@ -7,6 +7,32 @@ import { getInitialBounds, getVisibleBounds, getPanelBounds, getYardBoundsForPan
 import { createPositionStore } from '../desktop/position-store.cjs';
 import { getIdlePose, CYCLE_MS } from '../desktop/cat.js';
 import { isHitRegion, hitsRegion, createPetInput } from '../desktop/input.cjs';
+import { characters, drawCharacter } from '../desktop/characters.js';
+
+test('all characters keep every action inside the pixel canvas and animate in place', () => {
+  function frame(id, state, time) {
+    const operations = [];
+    const ctx = {
+      fillStyle: '#000000', clearRect() {},
+      fillRect(x, y, width, height) {
+        assert.ok(x >= 0 && y >= 0 && width > 0 && height > 0 && x + width <= 24 && y + height <= 24, `${id}/${state} stays inside its canvas`);
+        assert.match(this.fillStyle, /^#[0-9a-f]{6}([0-9a-f]{2})?$/i);
+        operations.push([x, y, width, height, this.fillStyle]);
+      },
+    };
+    drawCharacter(ctx, id, state, time);
+    return operations;
+  }
+  for (const { id } of characters) {
+    for (const state of ['idle', 'eating', 'processing', 'success', 'failure', 'attack']) {
+      for (const time of [0, 180, 650, 800, 1500, 3250, 4799]) assert.ok(frame(id, state, time).length > 0);
+    }
+    assert.deepEqual(frame(id, 'idle', 0), frame(id, 'idle', 4800));
+    assert.notDeepEqual(frame(id, 'idle', 0), frame(id, 'idle', 1500));
+    assert.notDeepEqual(frame(id, 'eating', 650), frame(id, 'eating', 800));
+    assert.notDeepEqual(frame(id, 'attack', 0), frame(id, 'attack', 180));
+  }
+});
 
 test('initial placement respects work area origin and dock reservation', () => {
   assert.deepEqual(getInitialBounds({ x: -1920, y: 30, width: 1920, height: 1000 }), {

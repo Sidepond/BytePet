@@ -1,6 +1,8 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const DEFAULTS = { ground: true, menuSide: 'left' };
+const catalog = require('./character-catalog.js').default;
+const characterIds = new Set(catalog.map(character => character.id));
+const DEFAULTS = { ground: true, menuSide: 'left', character: 'cat-cheese' };
 const valid = value => value && typeof value.ground === 'boolean' && ['left', 'right'].includes(value.menuSide);
 
 function createAppearanceStore(directory) {
@@ -11,7 +13,12 @@ function createAppearanceStore(directory) {
         if (fs.statSync(file).size > 16384) throw new Error('Settings too large');
         const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
         if (saved?.version !== 1 || !valid(saved.preferences)) throw new Error('Invalid settings');
-        return { preferences: { ground: saved.preferences.ground, menuSide: saved.preferences.menuSide }, warning: null };
+        const character = saved.preferences.character ?? DEFAULTS.character;
+        return {
+          preferences: { ground: saved.preferences.ground, menuSide: saved.preferences.menuSide,
+            character: characterIds.has(character) ? character : DEFAULTS.character },
+          warning: characterIds.has(character) ? null : '저장된 캐릭터를 찾지 못해 치즈 고양이로 시작했어요.',
+        };
       } catch (error) {
         return { preferences: { ...DEFAULTS }, warning: error.code === 'ENOENT' ? null : '화면 설정을 읽지 못해 기본값으로 시작했어요.' };
       }
@@ -44,8 +51,9 @@ function createAppearanceService({ ipcMain, store, initial = store.read(), getPe
   });
   ipcMain.handle('appearance:set', (event, change) => {
     if (!from(event, getPanel())) return { ok: false, error: '허용되지 않은 요청이에요.' };
-    if (!change || typeof change.key !== 'string' || !Object.hasOwn(DEFAULTS, change.key) ||
-        (change.key === 'ground' ? typeof change.value !== 'boolean' : !['left', 'right'].includes(change.value))) {
+    const validators = { ground: value => typeof value === 'boolean', menuSide: value => ['left', 'right'].includes(value),
+      character: value => characterIds.has(value) };
+    if (!change || typeof change.key !== 'string' || !Object.hasOwn(validators, change.key) || !validators[change.key](change.value)) {
       return { ok: false, error: '올바른 화면 설정을 선택해 주세요.' };
     }
     const next = { ...preferences, [change.key]: change.value };

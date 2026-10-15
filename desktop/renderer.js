@@ -1,5 +1,5 @@
 import { moduleEnabled, moduleState, modulesReady, onModulesChanged } from './module-state.js';
-import { drawCat, drawEatingCat, drawResultCat, drawAttackCat } from './cat.js';
+import { characterFor, drawCharacter } from './characters.js';
 import { appearanceReady, appearanceState, onAppearanceChanged } from './appearance-state.js';
 import { createReactionPlayer } from './reaction.js';
 import { enableDragging } from './drag.js';
@@ -84,12 +84,9 @@ onModulesChanged(({ modules }) => {
 });
 
 function render() {
-  const elapsed = performance.now() - reaction.startedAt;
-  if (reaction.state === 'eating') drawEatingCat(ctx, reducedMotion.matches ? 1500 : elapsed);
-  else if (reaction.state === 'attack') drawAttackCat(ctx, reducedMotion.matches ? 150 : elapsed);
-  else if (reaction.state === 'processing') drawEatingCat(ctx, reducedMotion.matches ? 700 : 400 + elapsed % 900);
-  else if (reaction.state === 'success' || reaction.state === 'failure') drawResultCat(ctx, reaction.state, reducedMotion.matches ? 0 : elapsed);
-  else drawCat(ctx, reducedMotion.matches ? 0 : performance.now() - startedAt);
+  let elapsed = performance.now() - (reaction.state === 'idle' ? startedAt : reaction.startedAt);
+  if (reducedMotion.matches) elapsed = reaction.state === 'eating' ? 1500 : reaction.state === 'attack' ? 150 : reaction.state === 'processing' ? 300 : 0;
+  drawCharacter(ctx, appearanceState().preferences.character, reaction.state, elapsed);
   reportHitRegion();
 }
 
@@ -104,14 +101,16 @@ reducedMotion.addEventListener('change', updateAnimation);
 document.addEventListener('visibilitychange', updateAnimation);
 window.addEventListener('pagehide', () => { clearInterval(timer); clearTimeout(messageTimer); reactions.dispose(); }, { once: true });
 function applyAppearance() {
-  const { ground, menuSide } = appearanceState().preferences;
+  const { ground, menuSide, character } = appearanceState().preferences;
+  const selected = characterFor(character);
+  canvas.dataset.character = selected.id;
+  canvas.setAttribute('aria-label', `${selected.name} 유틸리티 패널`);
   document.querySelector('#yard-ground').hidden = !ground;
   const x = ground && menuSide === 'left' ? Math.max(0, innerWidth - 112) : Math.min(16, Math.max(0, innerWidth - 96));
   canvas.style.left = `${x}px`;
   message.style.left = `${Math.max(0, Math.min(innerWidth - 128, x - 16))}px`;
-  reportHitRegion();
+  updateAnimation();
 }
 window.addEventListener('resize', applyAppearance);
 onAppearanceChanged(applyAppearance);
 applyAppearance();
-updateAnimation();

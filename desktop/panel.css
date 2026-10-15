@@ -108,6 +108,10 @@ body.food-over .roof-surface { stroke: var(--accent); }
 .module-toggle input:checked::before { transform: translateX(12px); }
 .module-toggle input:disabled { opacity: .5; cursor: default; }
 .settings-hint { margin: 9px 2px 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
+#character-picker { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-bottom: 16px; }
+#character-picker button { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 5px 2px; font-size: 10px; background: #fffdfa; }
+#character-picker button[aria-pressed="true"] { border-color: var(--accent); background: #e9f3ee; box-shadow: inset 0 0 0 1px var(--accent); }
+#character-picker canvas { width: 48px; height: 48px; image-rendering: pixelated; }
 #module-off { text-align: center; padding: 20px 0; }
 #module-off-message { color: var(--muted); margin: 0 0 14px; }
 

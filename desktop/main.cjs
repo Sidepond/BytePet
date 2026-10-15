@@ -63,6 +63,10 @@ function createPetWindow() {
   const panel = createUtilityPanel(win, {
     appearanceStore, appearanceInitial,
     applyAppearance(next) {
+      if (preferences.ground === next.ground && preferences.menuSide === next.menuSide) {
+        preferences = next;
+        return;
+      }
       const previous = win.getBounds();
       const catX = previous.x + (preferences.ground && preferences.menuSide === 'left' ? previous.width - 112 : 16);
       preferences = next;

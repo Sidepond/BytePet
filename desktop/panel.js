@@ -1,4 +1,5 @@
 import { appearanceReady, appearanceState, onAppearanceChanged } from './appearance-state.js';
+import { characters, drawCharacter } from './characters.js';
 import { moduleEnabled, modulesReady, moduleState, onModulesChanged } from './module-state.js';
 import { enableFoodDrop, resultMessage } from './feeding.js';
 import { setupJwtPanel } from './jwt-panel.js';
@@ -27,11 +28,11 @@ function renderView() {
   document.querySelector('#module-off').hidden = !off;
   document.querySelector('#module-off-message').textContent = `${view === 'food' ? '먹이·변환' : '개발 포트'} 모듈이 꺼져 있어요.`;
   for (const name of ['food', 'ports', 'settings']) document.querySelector(`#show-${name}`).setAttribute('aria-pressed', String(view === name));
-  document.querySelector('#panel-title').textContent = view === 'settings' ? '모듈 설정' : view === 'ports' ? '개발 포트' : '오늘의 먹이';
+  document.querySelector('#panel-title').textContent = view === 'settings' ? '설정' : view === 'ports' ? '개발 포트' : '오늘의 먹이';
 }
 function focusView() {
   if (view === 'food' && moduleEnabled('m01')) draft.focus({ preventScroll: true });
-  else if (view === 'settings') document.querySelector('#module-m01').focus({ preventScroll: true });
+  else if (view === 'settings') document.querySelector('#character-picker button[aria-pressed="true"]').focus();
   else document.querySelector(`#show-${view}`).focus({ preventScroll: true });
 }
 function showView(next) {
@@ -229,12 +230,32 @@ for (const key of ['m01', 'm02']) document.querySelector(`#module-${key}`).addEv
 const sideControl = document.querySelector('#menu-side');
 const groundControl = document.querySelector('#show-ground');
 const appearanceStatus = document.querySelector('#appearance-status');
+const characterButtons = characters.map(character => {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.dataset.character = character.id;
+  button.setAttribute('aria-label', character.name);
+  const preview = document.createElement('canvas');
+  preview.width = preview.height = 24;
+  preview.setAttribute('aria-hidden', 'true');
+  drawCharacter(preview.getContext('2d'), character.id);
+  const label = document.createElement('span');
+  label.textContent = character.name;
+  button.append(preview, label);
+  button.addEventListener('click', () => changeAppearance('character', character.id));
+  document.querySelector('#character-picker').append(button);
+  return button;
+});
 let appearanceBusy = false;
 function syncAppearance() {
   const { preferences, warning } = appearanceState();
   sideControl.value = preferences.menuSide;
   groundControl.checked = preferences.ground;
   sideControl.disabled = groundControl.disabled = appearanceBusy;
+  for (const button of characterButtons) {
+    button.disabled = appearanceBusy;
+    button.setAttribute('aria-pressed', String(button.dataset.character === preferences.character));
+  }
   if (warning) {
     appearanceStatus.classList.add('error');
     appearanceStatus.textContent = warning;

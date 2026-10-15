@@ -26,11 +26,11 @@ const head = [
   '..ooffffffoo....',
 ];
 
-function paintRows(ctx, rows, x, y) {
+function paintRows(ctx, rows, x, y, colors = palette) {
   rows.forEach((row, dy) => {
     [...row].forEach((pixel, dx) => {
-      if (!palette[pixel]) return;
-      ctx.fillStyle = palette[pixel];
+      if (!colors[pixel]) return;
+      ctx.fillStyle = colors[pixel];
       ctx.fillRect(x + dx, y + dy, 1, 1);
     });
   });
@@ -45,7 +45,7 @@ export function getIdlePose(elapsed) {
   };
 }
 
-export function drawCat(ctx, elapsed) {
+export function drawCat(ctx, elapsed, colors = palette) {
   const pose = getIdlePose(elapsed);
   ctx.clearRect(0, 0, SIZE, SIZE);
   ctx.imageSmoothingEnabled = false;
@@ -56,11 +56,11 @@ export function drawCat(ctx, elapsed) {
   // Tail moves independently while paws remain planted.
   const tips = [[21, 15], [22, 14], [21, 13], [20, 14]];
   const [tx, ty] = tips[pose.tail];
-  ctx.fillStyle = palette.o;
+  ctx.fillStyle = colors.o;
   ctx.fillRect(18, 19, 5, 3);
   ctx.fillRect(21, ty + 1, 2, 6);
   ctx.fillRect(tx, ty, 2, 2);
-  ctx.fillStyle = palette.f;
+  ctx.fillStyle = colors.f;
   ctx.fillRect(18, 20, 4, 1);
   ctx.fillRect(21, ty + 2, 1, 6);
 
@@ -75,10 +75,10 @@ export function drawCat(ctx, elapsed) {
     'oofffcooffffoo',
     'occccoocccccco',
     '.oooo..oooooo.',
-  ], 5, 13);
+  ], 5, 13, colors);
 
-  paintRows(ctx, head, 4, 3 + pose.lift);
-  ctx.fillStyle = palette.o;
+  paintRows(ctx, head, 4, 3 + pose.lift, colors);
+  ctx.fillStyle = colors.eye ?? colors.o;
   ctx.fillRect(8, 9 + pose.lift, 2, pose.blink ? 1 : 2);
   ctx.fillRect(15, 9 + pose.lift, 2, pose.blink ? 1 : 2);
   if (!pose.blink) {
@@ -86,9 +86,9 @@ export function drawCat(ctx, elapsed) {
     ctx.fillRect(8, 9 + pose.lift, 1, 1);
     ctx.fillRect(15, 9 + pose.lift, 1, 1);
   }
-  ctx.fillStyle = palette.p;
+  ctx.fillStyle = colors.p;
   ctx.fillRect(12, 11 + pose.lift, 1, 1);
-  ctx.fillStyle = palette.o;
+  ctx.fillStyle = colors.o;
   ctx.fillRect(11, 12 + pose.lift, 1, 1);
   ctx.fillRect(13, 12 + pose.lift, 1, 1);
   ctx.fillStyle = '#459b8f';
@@ -97,20 +97,20 @@ export function drawCat(ctx, elapsed) {
   ctx.fillRect(12, 15, 2, 2);
 }
 
-export function drawEatingCat(ctx, elapsed) {
-  drawCat(ctx, 0);
+export function drawEatingCat(ctx, elapsed, colors = palette) {
+  drawCat(ctx, 0, colors);
   const chewing = elapsed >= 400 && elapsed < 1350;
   const mouthHeight = chewing ? 1 + Math.floor(elapsed / 150) % 2 : 1;
   // Cover the idle mouth, then chew with lifted paws and pink cheeks.
-  ctx.fillStyle = palette.c;
+  ctx.fillStyle = colors.c;
   ctx.fillRect(10, 12, 5, 2);
-  ctx.fillStyle = palette.o;
+  ctx.fillStyle = colors.o;
   ctx.fillRect(11, 12, 3, mouthHeight);
-  ctx.fillStyle = palette.p;
+  ctx.fillStyle = colors.p;
   ctx.fillRect(7, 11, 2, 1);
   ctx.fillRect(16, 11, 2, 1);
   if (elapsed < 1350) {
-    ctx.fillStyle = palette.l;
+    ctx.fillStyle = colors.l;
     ctx.fillRect(9, 14, 2, 2);
     ctx.fillRect(14, 14, 2, 2);
     ctx.fillStyle = '#459b8f';
@@ -118,32 +118,32 @@ export function drawEatingCat(ctx, elapsed) {
     ctx.fillRect(x, 13, chewing ? 1 : 3, 2);
   } else {
     // A small heart marks successful feeding before returning to idle.
-    ctx.fillStyle = palette.p;
-    paintRows(ctx, ['p.p', 'ppp', '.p.'], 19, 3);
-    ctx.fillStyle = palette.o;
+    ctx.fillStyle = colors.p;
+    paintRows(ctx, ['p.p', 'ppp', '.p.'], 19, 3, colors);
+    ctx.fillStyle = colors.o;
     ctx.fillRect(11, 12, 1, 1);
     ctx.fillRect(13, 12, 1, 1);
     ctx.fillRect(12, 13, 1, 1);
   }
 }
 
-export function drawResultCat(ctx, state, elapsed) {
+export function drawResultCat(ctx, state, elapsed, colors = palette) {
   if (state === 'success') {
-    drawEatingCat(ctx, 1500);
+    drawEatingCat(ctx, 1500, colors);
     ctx.fillStyle = '#459b8f';
     const y = Math.floor(elapsed / 200) % 2 ? 4 : 5;
     ctx.fillRect(2, y, 1, 3);
     ctx.fillRect(1, y + 1, 3, 1);
     return;
   }
-  drawCat(ctx, 0);
+  drawCat(ctx, 0, colors);
   // Raised eyebrows, a small round mouth, and a blue question mark.
-  ctx.fillStyle = palette.o;
+  ctx.fillStyle = colors.o;
   ctx.fillRect(8, 7, 2, 1);
   ctx.fillRect(15, 8, 2, 1);
-  ctx.fillStyle = palette.c;
+  ctx.fillStyle = colors.c;
   ctx.fillRect(10, 12, 5, 2);
-  ctx.fillStyle = palette.o;
+  ctx.fillStyle = colors.o;
   ctx.fillRect(12, 12, 2, 2);
   ctx.fillStyle = '#6a99b4';
   const y = Math.floor(elapsed / 250) % 2 ? 1 : 2;
@@ -153,12 +153,12 @@ export function drawResultCat(ctx, state, elapsed) {
   ctx.fillRect(21, y + 4, 1, 1);
 }
 
-export function drawAttackCat(ctx, elapsed) {
-  drawCat(ctx, 0);
+export function drawAttackCat(ctx, elapsed, colors = palette) {
+  drawCat(ctx, 0, colors);
   const extended = Math.floor(elapsed / 130) % 4 >= 1;
   // Lift the right paw, then swipe outwards with a small impact spark.
-  paintRows(ctx, extended ? ['ooooo', 'offfo', 'occco', '.ooo.'] : ['ooo', 'ofo', 'oco', 'ooo'], extended ? 17 : 15, 13);
-  ctx.fillStyle = palette.o;
+  paintRows(ctx, extended ? ['ooooo', 'offfo', 'occco', '.ooo.'] : ['ooo', 'ofo', 'oco', 'ooo'], extended ? 17 : 15, 13, colors);
+  ctx.fillStyle = colors.o;
   ctx.fillRect(8, 8, 2, 1);
   ctx.fillRect(15, 8, 2, 1);
   if (extended) {

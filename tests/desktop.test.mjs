@@ -64,6 +64,100 @@ async function runTool(panel, format) {
   await panel.locator('#run-tool').click();
 }
 
+test('Characters: six previews, live selection, reactions, hit regions and restart persistence', { timeout: 30000 }, async t => {
+  const profile = await profileFor(t);
+  await writeFile(path.join(profile, 'appearance.json'), JSON.stringify({ version: 1, preferences: { ground: false, menuSide: 'right' } }));
+  let app = await launch(profile);
+  try {
+    let { pet, panel } = await openPanel(app);
+    const errors = [];
+    pet.on('pageerror', error => errors.push(error.message));
+    panel.on('pageerror', error => errors.push(error.message));
+    await pet.emulateMedia({ reducedMotion: 'reduce' });
+    await panel.locator('#draft').fill('캐릭터를 바꿔도 남아 있을 메모');
+    await panel.locator('#show-settings').click();
+    const anchor = await bounds(app);
+    await app.evaluate(({ BrowserWindow, screen }) => {
+      const win = BrowserWindow.getAllWindows().find(win => win.getTitle() === 'BytePet');
+      const original = win.setIgnoreMouseEvents.bind(win);
+      win.setIgnoreMouseEvents = (ignore, options) => { globalThis.characterIgnoring = ignore; original(ignore, options); };
+      globalThis.characterCursor = { x: -10000, y: -10000 };
+      screen.getCursorScreenPoint = () => globalThis.characterCursor;
+    });
+    assert.equal(await panel.locator('#character-picker button').count(), 6);
+    const ids = ['cat-cheese', 'cat-tuxedo', 'cat-black', 'dog-shiba', 'dog-retriever', 'dog-corgi'];
+    const frames = new Set();
+    for (const id of ids) {
+      await panel.locator(`#character-picker button[data-character="${id}"]`).click();
+      await pet.waitForFunction(id => document.querySelector('#pet').dataset.character === id, id);
+      await panel.waitForFunction(() => !document.querySelector('#character-picker button').disabled);
+      assert.equal(await panel.locator(`#character-picker button[data-character="${id}"]`).getAttribute('aria-pressed'), 'true');
+      assert.deepEqual(await bounds(app), anchor, 'selection never moves the yard');
+      const snapshot = await pet.locator('#pet').evaluate(canvas => ({ image: canvas.toDataURL(),
+        alpha: canvas.getContext('2d').getImageData(0, 0, 24, 24).data[3] }));
+      assert.equal(snapshot.alpha, 0, 'corner stays click-through');
+      frames.add(snapshot.image);
+      const hit = await pet.locator('#pet').evaluate(canvas => {
+        const pixels = canvas.getContext('2d').getImageData(0, 0, 24, 24).data;
+        const index = Array.from({ length: 576 }, (_, i) => i).find(i => pixels[i * 4 + 3] === 255);
+        const rect = canvas.getBoundingClientRect();
+        return { x: rect.x + index % 24 * 4 + 2, y: rect.y + Math.floor(index / 24) * 4 + 2, corner: { x: rect.x + 1, y: rect.y + 1 } };
+      });
+      await app.evaluate((_electron, point) => { globalThis.characterCursor = point; }, { x: anchor.x + hit.x, y: anchor.y + hit.y });
+      await waitUntil(() => app.evaluate(() => globalThis.characterIgnoring === false));
+      await app.evaluate((_electron, point) => { globalThis.characterCursor = point; }, { x: anchor.x + hit.corner.x, y: anchor.y + hit.corner.y });
+      await waitUntil(() => app.evaluate(() => globalThis.characterIgnoring === true));
+    }
+    assert.equal(frames.size, 6, 'each character has distinct artwork');
+    const still = await pet.locator('#pet').evaluate(canvas => canvas.toDataURL());
+    await pet.waitForTimeout(250);
+    assert.equal(await pet.locator('#pet').evaluate(canvas => canvas.toDataURL()), still, 'reduced motion remains static after selection');
+    assert.equal((await pet.evaluate(() => window.appearance.set('character', 'cat-black'))).ok, false);
+    assert.equal((await panel.evaluate(() => window.appearance.set('character', 'unknown'))).ok, false);
+    await panel.evaluate(() => window.resultTools.react('success'));
+    await pet.waitForFunction(() => document.querySelector('#pet').dataset.state === 'processing');
+    await panel.locator('#character-picker button[data-character="dog-retriever"]').click();
+    await pet.waitForFunction(() => document.querySelector('#pet').dataset.character === 'dog-retriever');
+    assert.notEqual(await pet.locator('#pet').evaluate(canvas => canvas.toDataURL()), still);
+    await pet.waitForFunction(() => document.querySelector('#pet').dataset.state === 'success');
+
+    // Render a review sheet from the same functions used by the live pet.
+    const sheet = await panel.evaluate(async () => {
+      const { characters, drawCharacter } = await import('./characters.js');
+      const states = ['idle', 'eating', 'processing', 'success', 'failure', 'attack'];
+      const canvas = document.createElement('canvas');
+      canvas.width = 960; canvas.height = 840;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#f1f4f0'; ctx.fillRect(0, 0, 960, 840);
+      ctx.font = '13px -apple-system, sans-serif'; ctx.textAlign = 'center';
+      characters.forEach((character, col) => states.forEach((state, row) => {
+        const frame = document.createElement('canvas'); frame.width = frame.height = 24;
+        drawCharacter(frame.getContext('2d'), character.id, state, state === 'attack' ? 180 : 650);
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(frame, col * 160 + 32, row * 140 + 10, 96, 96);
+        ctx.fillStyle = '#33473e'; ctx.fillText(`${character.name} · ${state}`, col * 160 + 80, row * 140 + 126);
+      }));
+      return canvas.toDataURL();
+    });
+    await mkdir(path.join(root, 'test-results'), { recursive: true });
+    await writeFile(path.join(root, 'test-results/characters.png'), Buffer.from(sheet.split(',')[1], 'base64'));
+    await panel.screenshot({ path: path.join(root, 'test-results/character-settings.png'), omitBackground: true });
+    await panel.locator('#show-food').click();
+    assert.equal(await panel.locator('#draft').inputValue(), '캐릭터를 바꿔도 남아 있을 메모');
+    assert.deepEqual(errors, []);
+    await app.close();
+    app = await launch(profile);
+    ({ pet, panel } = await openPanel(app));
+    await pet.waitForFunction(() => document.querySelector('#pet').dataset.character === 'dog-retriever');
+    await panel.locator('#show-settings').click();
+    assert.equal(await panel.locator('#character-picker button[data-character="dog-retriever"]').getAttribute('aria-pressed'), 'true');
+    assert.equal(await panel.locator('#show-ground').isChecked(), false);
+    assert.equal(await panel.locator('#menu-side').inputValue(), 'right');
+  } finally {
+    await app.close();
+  }
+});
+
 test('F01: native transparent pet, idle playback, reduced motion, and clean exit', { timeout: 30000 }, async t => {
   const app = await launch(await profileFor(t));
   try {
@@ -1660,7 +1754,7 @@ test('Panel: compact views resize within the display, preserve drafts, and keep 
     await panel.screenshot({ path: path.join(root, 'test-results/panel-result.png') });
     await panel.locator('#show-settings').click();
     await expectHeight(530);
-    assert.equal(await panel.locator('#module-m01').evaluate(el => el === document.activeElement), true);
+    assert.equal(await panel.locator('#character-picker button[aria-pressed="true"]').evaluate(el => el === document.activeElement), true);
     await panel.screenshot({ path: path.join(root, 'test-results/panel-settings.png') });
     await pet.evaluate(() => window.utilityPanel.setView('food'));
     await panel.evaluate(() => window.utilityPanel.setView('invalid'));
@@ -1734,7 +1828,7 @@ test('Layout: cat stays still, left/right and ground switches apply immediately 
     house = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(win => win.getTitle() === 'BytePet 유틸리티').getBounds());
     yard = await bounds(app);
     assert.equal(house.x, yard.x + yard.width + 8);
-    assert.deepEqual(JSON.parse(await readFile(path.join(profile, 'appearance.json'), 'utf8')), { version: 1, preferences: { ground: false, menuSide: 'right' } });
+    assert.deepEqual(JSON.parse(await readFile(path.join(profile, 'appearance.json'), 'utf8')), { version: 1, preferences: { ground: false, menuSide: 'right', character: 'cat-cheese' } });
     await panel.locator('#show-food').click();
     assert.equal(await panel.locator('#draft').inputValue(), 'keep this draft');
     await app.close();

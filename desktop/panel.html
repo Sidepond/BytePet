@@ -41,7 +41,10 @@
 
         <button id="enable-module" type="button">설정 열기</button>
       </section>
-      <section id="settings-view" aria-label="모듈 설정" hidden>
+      <section id="settings-view" aria-label="설정" hidden>
+        <h2 class="section-label">캐릭터</h2>
+        <div id="character-picker" role="group" aria-label="캐릭터 선택"></div>
+        <p id="appearance-status" role="status" aria-live="polite"></p>
         <h2 class="section-label">화면</h2>
         <div class="settings-group">
           <label class="module-option" for="menu-side">
@@ -49,11 +52,10 @@
             <select id="menu-side"><option value="left">왼쪽</option><option value="right">오른쪽</option></select>
           </label>
           <label class="module-option" for="show-ground">
-            <span><strong>땅 표시</strong><small>집과 고양이 아래에 마당을 표시합니다</small></span>
+            <span><strong>땅 표시</strong><small>집과 캐릭터 아래에 마당을 표시합니다</small></span>
             <span class="module-toggle"><input id="show-ground" type="checkbox" role="switch" checked></span>
           </label>
         </div>
-        <p id="appearance-status" role="status" aria-live="polite"></p>
         <h2 class="section-label feature-label">사용할 기능</h2>
         <div class="settings-group">
         <label class="module-option" for="module-m01">
