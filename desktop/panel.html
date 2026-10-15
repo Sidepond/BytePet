@@ -19,15 +19,29 @@
       <div class="feed-actions">
         <button id="feed-text" type="button">먹이 주기</button>
         <button id="choose-files" type="button">파일·사진 선택</button>
+        <button id="decode-jwt" type="button" aria-controls="jwt-result">JWT 해독</button>
         <input id="files" type="file" multiple hidden>
       </div>
       <p id="feed-status" role="status" aria-live="polite">먹인 내용은 이 컴퓨터에 저장됩니다.</p>
+      <section id="jwt-result" aria-labelledby="jwt-title" tabindex="-1" hidden>
+        <div class="shelf-header"><h2 id="jwt-title">JWT 해독 결과</h2><button id="close-jwt" type="button">결과 닫기</button></div>
+        <p id="jwt-error" role="alert" hidden></p>
+        <div id="jwt-output" hidden>
+          <p id="jwt-signature"></p>
+          <p id="jwt-expiration" role="status" aria-live="polite"></p>
+          <p class="jwt-hint">현재 컴퓨터 시각 기준 · 해독만으로는 저장되지 않아요.</p>
+          <h3 id="jwt-header-title">Header</h3>
+          <pre id="jwt-header" tabindex="0" aria-labelledby="jwt-header-title"></pre>
+          <h3 id="jwt-payload-title">Payload</h3>
+          <pre id="jwt-payload" tabindex="0" aria-labelledby="jwt-payload-title"></pre>
+        </div>
+      </section>
       <section aria-labelledby="shelf-title">
         <div class="shelf-header"><h2 id="shelf-title">보관함</h2><button id="open-folder" type="button">폴더 열기</button></div>
         <ul id="food-list" aria-label="저장된 먹이"></ul>
         <p id="empty-shelf">아직 먹이가 없어요. 첫 먹이를 주세요!</p>
       </section>
-      <footer>JWT·JSON 변환, 포트 확인은 준비 중<kbd>Esc 닫기</kbd></footer>
+      <footer>JSON 정리, 포트 확인은 준비 중<kbd>Esc 닫기</kbd></footer>
     </main>
     <script type="module" src="panel.js"></script>
   </body>

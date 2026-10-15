@@ -1,6 +1,8 @@
 import { enableFoodDrop, resultMessage } from './feeding.js';
+import { setupJwtPanel } from './jwt-panel.js';
 
 const draft = document.querySelector('#draft');
+const clearJwtResult = setupJwtPanel(draft);
 const status = document.querySelector('#feed-status');
 const list = document.querySelector('#food-list');
 const files = document.querySelector('#files');
@@ -61,7 +63,7 @@ async function refresh() {
     }
     if (item.kind === 'text') button('텍스트 불러오기', async () => {
       const result = await window.food.readText(item.id);
-      if (result.ok) { draft.value = result.value; draft.focus(); }
+      if (result.ok) { draft.value = result.value; clearJwtResult(); draft.focus(); }
       return result;
     });
     else button('파일 열기', () => window.food.open(item.id));
@@ -73,7 +75,7 @@ async function refresh() {
 document.querySelector('#feed-text').addEventListener('click', async () => {
   const text = draft.value;
   const result = await consume(() => window.food.saveText(text));
-  if (result?.ok && result.value.items.length && draft.value === text) draft.value = '';
+  if (result?.ok && result.value.items.length && draft.value === text) { draft.value = ''; clearJwtResult(); }
 });
 document.querySelector('#choose-files').addEventListener('click', () => files.click());
 files.addEventListener('change', () => {
@@ -94,6 +96,7 @@ document.addEventListener('paste', event => {
   } else if (document.activeElement !== draft) {
     event.preventDefault();
     draft.value += event.clipboardData.getData('text/plain');
+    clearJwtResult();
     draft.focus();
   }
 });

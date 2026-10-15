@@ -8,6 +8,8 @@ import { _electron as electron } from 'playwright';
 import { getInitialBounds } from '../desktop/window.cjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
+const jwtToken = (payload, header = { alg: 'HS256', typ: 'JWT' }, signature = 'AA') =>
+  `${Buffer.from(JSON.stringify(header)).toString('base64url')}.${Buffer.from(JSON.stringify(payload)).toString('base64url')}.${signature}`;
 
 async function profileFor(t) {
   const profile = await realpath(await mkdtemp(path.join(tmpdir(), 'bytepet-desktop-')));
@@ -570,5 +572,88 @@ test('F05: partial file batches preserve successes; storage failures retain unsa
     assert.equal(await panel.locator('#draft').inputValue(), 'keep my unsaved input');
     assert.notEqual(await pet.locator('canvas').getAttribute('data-state'), 'eating');
     assert.equal(await readFile(path.join(blocked, 'food'), 'utf8'), 'do not overwrite');
+  } finally { await app.close(); }
+});
+
+test('F06: local JWT inspection, safe rendering, shelf restore, and stale-result clearing', { timeout: 30000 }, async t => {
+  const app = await launch(await profileFor(t));
+  try {
+    const { pet, panel } = await openPanel(app);
+    const errors = [];
+    const requests = [];
+    panel.on('pageerror', error => errors.push(error.message));
+    panel.on('request', request => { if (/^https?:/.test(request.url())) requests.push(request.url()); });
+    const payload = { sub: '고양이 🐱', role: 'developer', exp: 4102444800, note: '<img src=x onerror="window.injected=true">' };
+    const token = jwtToken(payload);
+    await panel.locator('#draft').fill(`Bearer ${token}`);
+    await panel.locator('#decode-jwt').click();
+    assert.deepEqual(JSON.parse(await panel.locator('#jwt-header').textContent()), { alg: 'HS256', typ: 'JWT' });
+    assert.deepEqual(JSON.parse(await panel.locator('#jwt-payload').textContent()), payload);
+    assert.match(await panel.locator('#jwt-signature').textContent(), /서명 미검증/);
+    assert.equal(await panel.locator('#jwt-expiration').getAttribute('data-state'), 'unexpired');
+    assert.match(await panel.locator('#jwt-expiration').textContent(), /2100-01-01.*UTC/);
+    assert.equal(await panel.locator('#jwt-output img').count(), 0);
+    assert.equal(await panel.evaluate(() => window.injected), undefined);
+    assert.equal((await panel.evaluate(() => window.food.list())).value.length, 0, 'inspection does not save a token');
+    assert.notEqual(await pet.locator('canvas').getAttribute('data-state'), 'eating');
+    await mkdir(path.join(root, 'test-results'), { recursive: true });
+    await panel.screenshot({ path: `${root}/test-results/f06-jwt.png` });
+    await panel.locator('#close-jwt').click();
+    assert.equal(await panel.locator('#jwt-result').isVisible(), false);
+    assert.equal(await panel.locator('#draft').inputValue(), `Bearer ${token}`);
+
+    await panel.locator('#feed-text').click();
+    await panel.waitForFunction(() => document.querySelector('#draft').value === '');
+    await panel.getByRole('button', { name: '텍스트 불러오기' }).click();
+    assert.equal(await panel.locator('#draft').inputValue(), `Bearer ${token}`);
+    await panel.locator('#decode-jwt').click();
+    assert.deepEqual(JSON.parse(await panel.locator('#jwt-payload').textContent()), payload);
+    await panel.keyboard.press('Escape');
+    await pet.evaluate(() => window.petPanel.toggle());
+    await panel.waitForFunction(() => document.activeElement?.id === 'draft');
+    assert.equal(await panel.locator('#jwt-result').isVisible(), true);
+    await panel.locator('#draft').fill('different input');
+    assert.equal(await panel.locator('#jwt-result').isVisible(), false);
+    assert.equal(await panel.locator('#jwt-payload').textContent(), '');
+    await panel.locator('#decode-jwt').click();
+    assert.match(await panel.locator('#jwt-error').textContent(), /Header.Payload.Signature/);
+    await panel.getByRole('button', { name: '텍스트 불러오기' }).click();
+    assert.equal(await panel.locator('#jwt-result').isVisible(), false, 'loading a stored draft clears an earlier result');
+    assert.deepEqual(errors, []);
+    assert.deepEqual(requests, []);
+  } finally { await app.close(); }
+});
+
+test('F06: invalid tokens, missing/invalid expiration, unsigned tokens, and live expiry', { timeout: 30000 }, async t => {
+  const app = await launch(await profileFor(t));
+  try {
+    const { panel } = await openPanel(app);
+    for (const [input, message] of [
+      ['', /입력해/], ['a.b.c.d.e', /JWE/], ['e30._w.AA', /UTF-8/],
+      [jwtToken([], { alg: 'HS256' }), /JSON 객체/],
+    ]) {
+      await panel.locator('#draft').fill(input);
+      await panel.locator('#decode-jwt').click();
+      assert.match(await panel.locator('#jwt-error').textContent(), message);
+      assert.equal(await panel.locator('#jwt-output').isVisible(), false);
+      assert.equal(await panel.locator('#draft').inputValue(), input);
+    }
+    for (const [payload, state] of [[{}, 'missing'], [{ exp: '123' }, 'invalid'], [{ exp: 0 }, 'expired']]) {
+      await panel.locator('#draft').fill(jwtToken(payload, { alg: 'none' }, ''));
+      await panel.locator('#decode-jwt').click();
+      assert.equal(await panel.locator('#jwt-expiration').getAttribute('data-state'), state);
+      assert.match(await panel.locator('#jwt-signature').textContent(), /서명 없음/);
+      assert.deepEqual(JSON.parse(await panel.locator('#jwt-payload').textContent()), payload);
+      assert.equal(await panel.locator('#jwt-error').isVisible(), false);
+    }
+    await panel.locator('#draft').fill(jwtToken({ exp: Date.now() / 1000 + 2.5 }));
+    await panel.locator('#decode-jwt').click();
+    assert.equal(await panel.locator('#jwt-expiration').getAttribute('data-state'), 'unexpired');
+    await panel.waitForFunction(() => document.querySelector('#jwt-expiration').dataset.state === 'expired');
+    // A failed decode must remove all previous output, not leave a plausible old payload.
+    await panel.locator('#draft').fill('broken');
+    await panel.locator('#decode-jwt').click();
+    assert.equal(await panel.locator('#jwt-payload').textContent(), '');
+    assert.equal(await panel.locator('#jwt-output').isVisible(), false);
   } finally { await app.close(); }
 });
