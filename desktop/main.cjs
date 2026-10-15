@@ -5,11 +5,26 @@ const { createPositionStore } = require('./position-store.cjs');
 const { createPetInput } = require('./input.cjs');
 const { createAppearanceStore } = require('./appearance.cjs');
 const { createUtilityPanel } = require('./panel.cjs');
+const { createStatusTray } = require('./tray.cjs');
 
 app.setName('BytePet');
 let petWindow;
+let petVisibility;
+let statusTray;
+
+function toggleVisibility() {
+  if (petVisibility) petVisibility.setHidden(!petVisibility.isHidden());
+}
+
+function updateVisibilityMenu(hidden) {
+  statusTray?.refresh(hidden);
+  const item = Menu.getApplicationMenu()?.getMenuItemById('toggle-pet-visibility');
+  if (item) item.label = hidden ? '다시 표시' : '잠시 숨기기';
+}
 
 function createPetWindow() {
+  let hidden = false;
+  let ready = false;
   const appearanceStore = createAppearanceStore(app.getPath('userData'));
   const appearanceInitial = appearanceStore.read();
   let preferences = appearanceInitial.preferences;
@@ -57,7 +72,10 @@ function createPetWindow() {
   win.setAlwaysOnTop(true, 'floating');
   // Configure once: repeating this on show would briefly hide macOS windows.
   if (process.platform === 'darwin') win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  win.once('ready-to-show', () => win.showInactive());
+  win.once('ready-to-show', () => {
+    ready = true;
+    if (!hidden) win.showInactive();
+  });
   let drag;
   let saveTimer;
   function savePosition() {
@@ -72,8 +90,26 @@ function createPetWindow() {
     panel.reposition();
     savePosition();
   }
+  function setHidden(value) {
+    if (win.isDestroyed() || hidden === value) return;
+    hidden = value;
+    if (hidden) {
+      drag = null;
+      input.hold('drag', false);
+      panel.setSuspended(true);
+      win.hide();
+    } else {
+      keepVisible();
+      if (ready) win.showInactive();
+      panel.setSuspended(false);
+    }
+    updateVisibilityMenu(hidden);
+  }
+  petVisibility = { setHidden, isHidden: () => hidden };
+  updateVisibilityMenu(false);
   function handleDrag(event, action, point) {
     if (event.sender !== win.webContents || event.senderFrame !== win.webContents.mainFrame) return;
+    if (hidden) return;
     if (action === 'end') {
       if (drag) {
         drag = null;
@@ -121,6 +157,7 @@ function createPetWindow() {
     panel.dispose();
     for (const event of displayEvents) screen.removeListener(event, keepVisible);
     petWindow = null;
+    petVisibility = null;
   });
 
   // The renderer has only narrow pet input bridges and never opens external content.
@@ -144,14 +181,24 @@ function createPetWindow() {
 
 app.whenReady().then(() => {
   Menu.setApplicationMenu(Menu.buildFromTemplate([
-    { label: 'BytePet', submenu: [{ label: 'BytePet 종료', role: 'quit', accelerator: 'CommandOrControl+Q' }] },
+    { label: 'BytePet', submenu: [
+      { id: 'toggle-pet-visibility', label: '잠시 숨기기', click: toggleVisibility },
+      { type: 'separator' },
+      { label: 'BytePet 종료', role: 'quit', accelerator: 'CommandOrControl+Q' },
+    ] },
     { label: '편집', submenu: [{ role: 'undo' }, { role: 'redo' }, { type: 'separator' }, { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }] },
   ]));
   createPetWindow();
+  statusTray = createStatusTray(toggleVisibility);
   app.on('activate', () => {
     if (!petWindow) createPetWindow();
+    else if (petVisibility.isHidden()) petVisibility.setHidden(false);
     else petWindow.showInactive();
   });
 });
 
+app.on('will-quit', () => {
+  statusTray?.dispose();
+  statusTray = null;
+});
 app.on('window-all-closed', () => app.quit());

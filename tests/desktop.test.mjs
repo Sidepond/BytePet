@@ -490,6 +490,92 @@ test('F04: rapid toggles, panel following, and pet shutdown do not leave an orph
   }
 });
 
+test('Tray: hide and restore the yard and open house without losing drafts or placement', { timeout: 30000 }, async t => {
+  const profile = await profileFor(t);
+  let app = await launch(profile);
+  try {
+    const { pet, panel } = await openPanel(app);
+    await panel.locator('#draft').fill('숨겼다가 돌아와도 남아 있는 메모');
+    const originalBounds = await bounds(app);
+    // Observe the real tray's refreshed native menu, then exercise its callback.
+    // No production test bridge or renderer access to the tray is exposed.
+    await app.evaluate(({ Tray, Menu }) => {
+      const setContextMenu = Tray.prototype.setContextMenu;
+      Tray.prototype.setContextMenu = function (menu) {
+        globalThis.testTray = this;
+        globalThis.testTrayMenu = menu;
+        return setContextMenu.call(this, menu);
+      };
+      Menu.getApplicationMenu().getMenuItemById('toggle-pet-visibility').click();
+    });
+    const visible = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
+      .filter(win => win.isVisible()).map(win => win.getTitle()).sort());
+    assert.deepEqual(await visible(), []);
+    const hiddenMenu = await app.evaluate(({ Menu }) => ({
+      trayAlive: !globalThis.testTray.isDestroyed(),
+      trayLabel: globalThis.testTrayMenu.getMenuItemById('toggle-pet-visibility').label,
+      appLabel: Menu.getApplicationMenu().getMenuItemById('toggle-pet-visibility').label,
+      canQuit: globalThis.testTrayMenu.items.some(item => item.role === 'quit'),
+    }));
+    assert.deepEqual(hiddenMenu, { trayAlive: true, trayLabel: '다시 표시', appLabel: '다시 표시', canQuit: true });
+
+    // Late renderer messages cannot reopen a temporarily hidden house.
+    await pet.evaluate(async () => { window.petPanel.toggle(); await window.modules.get(); });
+    await panel.evaluate(async () => { window.utilityPanel.ready(); await window.modules.get(); });
+    assert.deepEqual(await visible(), []);
+    await app.evaluate(() => globalThis.testTrayMenu.getMenuItemById('toggle-pet-visibility').click());
+    await waitUntil(async () => (await visible()).length === 2);
+    assert.equal(await panel.locator('#draft').inputValue(), '숨겼다가 돌아와도 남아 있는 메모');
+    assert.deepEqual(await bounds(app), originalBounds);
+    assert.equal(app.windows().length, 2, 'restore reuses both windows');
+    assert.equal(await app.evaluate(() => globalThis.testTrayMenu.getMenuItemById('toggle-pet-visibility').label), '잠시 숨기기');
+    if (process.platform === 'darwin') assert.equal(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
+      .every(win => win.isVisibleOnAllWorkspaces())), true);
+
+    await panel.getByRole('button', { name: '패널 닫기', exact: true }).click();
+    await waitUntil(async () => (await visible()).length === 1);
+    await app.evaluate(() => globalThis.testTrayMenu.getMenuItemById('toggle-pet-visibility').click());
+    assert.deepEqual(await visible(), []);
+    await app.evaluate(() => globalThis.testTrayMenu.getMenuItemById('toggle-pet-visibility').click());
+    assert.deepEqual(await visible(), ['BytePet'], 'a previously closed house stays closed');
+
+    await app.evaluate(() => globalThis.testTrayMenu.getMenuItemById('toggle-pet-visibility').click());
+    await app.evaluate(({ app }) => app.emit('activate'));
+    assert.deepEqual(await visible(), ['BytePet'], 'Dock activation also recovers a hidden pet');
+    await app.evaluate(() => globalThis.testTrayMenu.getMenuItemById('toggle-pet-visibility').click());
+    await app.close();
+    app = await launch(profile);
+    await (await app.firstWindow()).waitForLoadState('load');
+    await waitUntil(async () => (await visible()).length === 1);
+    assert.deepEqual(await visible(), ['BytePet'], 'temporary hiding is not persisted across launches');
+  } finally {
+    await app.close();
+  }
+});
+
+test('Tray: hiding while the house loads prevents ready events from showing it', { timeout: 30000 }, async t => {
+  const app = await launch(await profileFor(t));
+  try {
+    const pet = await app.firstWindow();
+    await pet.waitForLoadState('load');
+    await app.evaluate(({ ipcMain, Menu }) => {
+      ipcMain.once('pet:panel-toggle', () => Menu.getApplicationMenu().getMenuItemById('toggle-pet-visibility').click());
+    });
+    const opened = app.waitForEvent('window');
+    await pet.evaluate(() => window.petPanel.toggle());
+    const panel = await opened;
+    await panel.waitForLoadState('load');
+    await panel.evaluate(async () => { window.utilityPanel.ready(); await window.modules.get(); });
+    assert.equal(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().some(win => win.isVisible())), false);
+    await app.evaluate(({ Menu }) => Menu.getApplicationMenu().getMenuItemById('toggle-pet-visibility').click());
+    await waitUntil(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().every(win => win.isVisible())));
+    await panel.locator('#draft').fill('복원 후 입력 가능');
+    assert.equal(await panel.locator('#draft').inputValue(), '복원 후 입력 가능');
+  } finally {
+    await app.close();
+  }
+});
+
 test('F05: text and original image files persist, and only successful saves trigger eating', { timeout: 30000 }, async t => {
   const profile = await profileFor(t);
   let app = await launch(profile);

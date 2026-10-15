@@ -11,6 +11,7 @@ function createUtilityPanel(pet, { appearanceStore, appearanceInitial, applyAppe
   let panel;
   let open = false;
   let ready = false;
+  let suspended = false;
   const viewHeights = { food: 588, ports: 588, settings: 530, off: 298 };
   let view = 'food';
   const appearance = createAppearanceService({
@@ -59,7 +60,7 @@ function createUtilityPanel(pet, { appearanceStore, appearanceInitial, applyAppe
     panel.setBounds(getPanelBounds(bounds, area, viewHeights[view], appearance.state().preferences));
   }
   function show() {
-    if (!ready || !open || !panel) return;
+    if (suspended || !ready || !open || !panel) return;
     reposition();
     panel.show();
     panel.focus();
@@ -100,7 +101,7 @@ function createUtilityPanel(pet, { appearanceStore, appearanceInitial, applyAppe
     return win && !win.isDestroyed() && event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame;
   }
   function toggle(event) {
-    if (!from(event, pet)) return;
+    if (suspended || !from(event, pet)) return;
     if (open) return hide();
     open = true;
     publish();
@@ -126,6 +127,16 @@ function createUtilityPanel(pet, { appearanceStore, appearanceInitial, applyAppe
 
   return {
     reposition,
+    setSuspended(value) {
+      if (suspended === value) return;
+      suspended = value;
+      // Keep the logical open state and renderer alive to preserve drafts.
+      if (suspended) {
+        if (panel && !panel.isDestroyed()) panel.hide();
+      } else {
+        show();
+      }
+    },
     dispose() {
       appearance.dispose();
       modules.dispose();
