@@ -1,7 +1,7 @@
 {
   "name": "bytepet",
   "productName": "BytePet",
-  "version": "0.1.0",
+  "version": "0.2.0-preview.1",
   "private": true,
   "description": "A pixel desktop pet for developers",
   "type": "module",
@@ -26,10 +26,16 @@
     "sprites:eating": "node scripts/generate-pixellab-eating.mjs",
     "sprites:dragging": "node scripts/generate-pixellab-dragging.mjs",
     "test:usage-desktop": "node --test tests/usage-desktop.test.mjs",
-    "package:preview": "node scripts/package-preview.mjs"
+    "package:preview": "node scripts/package-preview.mjs",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "test:tauri": "cargo test --manifest-path src-tauri/Cargo.toml",
+    "test:tauri:desktop": "node scripts/prepare-tauri.mjs && cargo build --manifest-path src-tauri/Cargo.toml && node --test --test-concurrency=1 tests/tauri-runtime.test.mjs",
+    "package:tauri:preview": "node scripts/package-tauri-preview.mjs"
   },
   "devDependencies": {
     "@electron/packager": "20.3.0",
+    "@tauri-apps/cli": "^2.12.3",
     "electron": "44.7.2",
     "playwright": "1.64.1"
   }

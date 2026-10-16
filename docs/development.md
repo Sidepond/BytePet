@@ -4,7 +4,7 @@
 
 ## 로컬 실행
 
-macOS, Node.js **22.12.0 이상**, npm이 필요합니다. 현재 앱은 Electron 기반입니다.
+macOS, Node.js **22.12.0 이상**, npm이 필요합니다. 기존 기본 실행은 Electron 기반입니다. `feat/tauri-migration` 브랜치에서는 `npm run tauri:dev`로 Tauri 버전도 실행할 수 있습니다. [Tauri 빌드·검증·데이터 가져오기 안내](tauri-migration.md)를 참고하세요.
 
 ```sh
 npm ci
@@ -22,12 +22,14 @@ npm start -- --user-data-dir=/tmp/bytepet-dev-profile
 | 경로 | 역할 |
 | --- | --- |
 | `desktop/main.cjs` | Electron 앱 진입점 |
+| `src-tauri/` | Tauri 앱 설정, Rust 창·저장소·포트·사용량 서비스 |
+| `tauri/` | 공유 화면을 연결하는 Tauri 브리지와 보관함 메뉴 |
 | `desktop/` | 펫 창, 집 메뉴, 로컬 보관함, 변환 도구, 포트 관리, AI 사용량 |
 | `desktop/assets/characters/` | 앱에 포함되는 캐릭터 PNG |
 | `desktop/sprite-manifest.js` | 스프라이트 경로와 재생 규격 |
 | `art/` | 현재 캐릭터 원본·승인 시트·규격·생성 기록 |
 | `scripts/` | 앱 패키징과 캐릭터 제작 도구 |
-| `tests/` | 단위·Electron GUI·패키지 테스트 |
+| `tests/` | 단위·Electron/WKWebView GUI·패키지 테스트 |
 
 ## 검증
 

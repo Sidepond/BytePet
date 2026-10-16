@@ -1,0 +1,4 @@
+
+.tauri-context-menu { position: fixed; z-index: 10000; min-width: 172px; padding: 5px; background: #fffdf7; color: #443e34; border: 1px solid #b8ab98; border-radius: 8px; box-shadow: 0 5px 16px #0003; }
+.tauri-context-menu button { display: block; width: 100%; padding: 6px 10px; border: 0; border-radius: 4px; background: transparent; color: inherit; text-align: left; font: inherit; }
+.tauri-context-menu button:hover, .tauri-context-menu button:focus { outline: none; color: white; background: #467a65; }

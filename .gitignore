@@ -29,3 +29,7 @@ art/**/*-rejected-*.json
 /art/**/raw-*.png
 /art/**/validation.json
 /art/pixellab-character-pack/designs.png
+
+# Tauri Rust build output
+/src-tauri/target/
+/src-tauri/gen/
