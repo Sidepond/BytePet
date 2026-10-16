@@ -40,3 +40,24 @@ export function drawLegacyCharacter(ctx, id, state = 'idle', elapsed = 0) {
   if (state === 'success' || state === 'failure') return (dog ? drawResultDog : drawResultCat)(ctx, state, elapsed, style);
   return (dog ? drawDog : drawCat)(ctx, elapsed, style);
 }
+
+const idleAnchors = new Map();
+export function characterIdleAnchor(id) {
+  const character = characterFor(id);
+  if (!idleAnchors.has(character.id)) {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 48;
+    const ctx = canvas.getContext('2d');
+    drawCharacter(ctx, character.id, 'idle', 0);
+    const pixels = ctx.getImageData(0, 0, 48, 48).data;
+    let first = -1, last = -1;
+    for (let i = 0; i < 48 * 48; i++) if (pixels[i * 4 + 3] > 0) {
+      if (first < 0) first = i;
+      last = i;
+    }
+    idleAnchors.set(character.id, first < 0 ? null : {
+      top: Math.floor(first / 48) / 48, bottom: (Math.floor(last / 48) + 1) / 48,
+    });
+  }
+  return idleAnchors.get(character.id);
+}

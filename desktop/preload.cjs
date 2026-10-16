@@ -61,7 +61,7 @@ contextBridge.exposeInMainWorld('utilityPanel', {
   ready: () => ipcRenderer.send('panel:ready'),
   setView: view => ipcRenderer.send('panel:view', view),
   onOpen: callback => {
-    const listener = () => callback();
+    const listener = (_event, view) => callback(view);
     ipcRenderer.on('panel:opened', listener);
     return () => ipcRenderer.removeListener('panel:opened', listener);
   },
@@ -120,5 +120,18 @@ contextBridge.exposeInMainWorld('food', {
     const listener = (_event, result) => callback(result);
     ipcRenderer.on('food:saved', listener);
     return () => ipcRenderer.removeListener('food:saved', listener);
+  },
+});
+
+contextBridge.exposeInMainWorld('aiUsage', {
+  get: () => ipcRenderer.invoke('usage:get'),
+  refresh: () => ipcRenderer.invoke('usage:refresh'),
+  set: (key, value) => ipcRenderer.invoke('usage:set', key, value),
+  connectClaude: enabled => ipcRenderer.invoke('usage:claude-connect', enabled),
+  open: () => ipcRenderer.send('usage:open'),
+  onChanged: callback => {
+    const listener = (_event, state) => callback(state);
+    ipcRenderer.on('usage:changed', listener);
+    return () => ipcRenderer.removeListener('usage:changed', listener);
   },
 });

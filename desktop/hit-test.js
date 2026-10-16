@@ -6,7 +6,7 @@ export function isCanvasHit(canvas, event) {
     canvas.getContext('2d').getImageData(x, y, 1, 1).data[3] > 0;
 }
 
-export function createHitRegionReporter(canvas, bridge) {
+export function createHitRegionReporter(canvas, bridge, getAnchor = () => null) {
   let previous;
   return () => {
     const rect = canvas.getBoundingClientRect();
@@ -14,6 +14,7 @@ export function createHitRegionReporter(canvas, bridge) {
     const region = {
       x: rect.x, y: rect.y, width: rect.width, height: rect.height,
       columns: canvas.width, rows: canvas.height,
+      anchor: getAnchor(),
       alpha: Array.from({ length: canvas.width * canvas.height }, (_, i) => data[i * 4 + 3]),
     };
     const signature = JSON.stringify(region);

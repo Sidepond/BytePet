@@ -1,5 +1,5 @@
 import { moduleEnabled, moduleState, modulesReady, onModulesChanged } from './module-state.js';
-import { characterFor, drawCharacter, charactersReady } from './characters.js';
+import { characterFor, drawCharacter, charactersReady, characterIdleAnchor } from './characters.js';
 import { appearanceReady, appearanceState, onAppearanceChanged } from './appearance-state.js';
 import { createReactionPlayer } from './reaction.js';
 import { enableDragging } from './drag.js';
@@ -29,7 +29,7 @@ canvas.addEventListener('keydown', event => {
     window.petPanel.toggle();
   }
 });
-const reportHitRegion = createHitRegionReporter(canvas, window.petInput);
+const reportHitRegion = createHitRegionReporter(canvas, window.petInput, () => characterIdleAnchor(appearanceState().preferences.character));
 const ctx = canvas.getContext('2d');
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 // Only schedule poses present in the approved image pack.

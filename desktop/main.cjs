@@ -6,6 +6,7 @@ const { createPetInput } = require('./input.cjs');
 const { createAppearanceStore } = require('./appearance.cjs');
 const { createUtilityPanel } = require('./panel.cjs');
 const { createStatusTray } = require('./tray.cjs');
+const { createUsageFeature } = require('./usage.cjs');
 
 app.setName('BytePet');
 // Keep development and packaged builds on the same data directory. Explicit
@@ -60,11 +61,13 @@ function createPetWindow() {
   });
   petWindow = win;
   const input = createPetInput(win, screen, preferences.ground);
+  let usage;
   const panel = createUtilityPanel(win, {
     appearanceStore, appearanceInitial,
     applyAppearance(next) {
       if (preferences.ground === next.ground && preferences.menuSide === next.menuSide) {
         preferences = next;
+        usage?.reposition();
         return;
       }
       const previous = win.getBounds();
@@ -80,6 +83,8 @@ function createPetWindow() {
       savePosition();
     },
   });
+  usage = createUsageFeature({ pet: win, getPanel: () => panel.window(),
+    getAppearance: () => preferences, getCharacterBounds: () => input.characterBounds(), openPanel: () => panel.openUsage() });
   win.setAlwaysOnTop(true, 'floating');
   // Configure once: repeating this on show would briefly hide macOS windows.
   if (process.platform === 'darwin') win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
@@ -167,6 +172,7 @@ function createPetWindow() {
     ipcMain.removeListener('pet:drag', handleDrag);
     ipcMain.removeListener('pet:hit-region', handleHitRegion);
     input.dispose();
+    usage.dispose();
     panel.dispose();
     for (const event of displayEvents) screen.removeListener(event, keepVisible);
     petWindow = null;

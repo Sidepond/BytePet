@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, realpath, rm, stat } from 'node:fs/promises';
+import { mkdtemp, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { createRequire } from 'node:module';
@@ -44,6 +44,7 @@ test('Package: standalone app preserves development data and restores the existi
   skip: process.platform !== 'darwin', timeout: 45000,
 }, async () => {
   const profile = await realpath(await mkdtemp(path.join(tmpdir(), 'bytepet-package-test-')));
+  await writeFile(path.join(profile, 'ai-usage.json'), JSON.stringify({ version: 1, preferences: { codex: false, claude: false, badgeMode: 'hidden', badgePosition: 'top', badgeWindow: 'primary' } }));
   let application;
   try {
     // Seed a real development profile, then open it through the standalone app.
@@ -81,6 +82,9 @@ test('Package: standalone app preserves development data and restores the existi
     await panel.waitForLoadState('load');
     await panel.getByText('개발 앱에서 저장한 먹이', { exact: true }).waitFor();
     await panel.locator('#draft').fill('중복 실행 후에도 유지할 초안');
+    // Relaunch raises a real native window. Keep unrelated keyboard/IME input
+    // from altering the seeded draft during the persistence assertion.
+    await panel.locator('#draft').evaluate(draft => { draft.readOnly = true; });
 
     for (const [executable, args] of [[executablePath, []], [devExecutable, [root]]]) {
       await application.evaluate(({ Menu }) => Menu.getApplicationMenu().getMenuItemById('toggle-pet-visibility').click());

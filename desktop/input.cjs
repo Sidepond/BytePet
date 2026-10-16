@@ -5,6 +5,8 @@ function isHitRegion(region) {
     region.x + region.width <= 496 && region.y + region.height <= 128 &&
     Number.isInteger(region.columns) && region.columns > 0 && region.columns <= 128 &&
     Number.isInteger(region.rows) && region.rows > 0 && region.rows <= 128 &&
+    (region.anchor == null || (Number.isFinite(region.anchor.top) && Number.isFinite(region.anchor.bottom) &&
+      region.anchor.top >= 0 && region.anchor.bottom <= 1 && region.anchor.top < region.anchor.bottom)) &&
     Array.isArray(region.alpha) && region.alpha.length === region.columns * region.rows &&
     region.alpha.every(alpha => Number.isInteger(alpha) && alpha >= 0 && alpha <= 255);
 }
@@ -24,6 +26,7 @@ function hitsGround(point, bounds) {
 
 function createPetInput(win, screen, groundVisible = true) {
   let region = null;
+  let characterBounds = null;
   let ignoring;
   const holds = new Set();
 
@@ -50,8 +53,16 @@ function createPetInput(win, screen, groundVisible = true) {
     update(next) {
       if (!isHitRegion(next)) return;
       region = next;
+      // The renderer measures this once from the selected character's idle
+      // pose. Animated alpha remains exclusive to click-through hit testing.
+      characterBounds = next.anchor ? {
+        x: next.x, width: next.width,
+        y: next.y + next.anchor.top * next.height,
+        height: (next.anchor.bottom - next.anchor.top) * next.height,
+      } : null;
       refresh();
     },
+    characterBounds: () => characterBounds,
     hits: point => hitsRegion(region, point) || (groundVisible && hitsGround(point, win.getContentBounds())),
     hold(reason, active) {
       if (active) holds.add(reason);
@@ -60,6 +71,7 @@ function createPetInput(win, screen, groundVisible = true) {
     },
     reset() {
       region = null;
+      characterBounds = null;
       holds.clear();
       refresh();
     },

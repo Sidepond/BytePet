@@ -6,6 +6,7 @@ import { setupJwtPanel } from './jwt-panel.js';
 import { setupJsonPanel } from './json-panel.js';
 import { setupFormatPanel } from './format-panel.js';
 import { setupPortsPanel } from './ports-panel.js';
+import { setupUsagePanel } from './usage-panel.js';
 
 await Promise.all([modulesReady, appearanceReady, charactersReady]);
 const draft = document.querySelector('#draft');
@@ -18,17 +19,19 @@ const status = document.querySelector('#feed-status');
 const list = document.querySelector('#food-list');
 const files = document.querySelector('#files');
 const ports = setupPortsPanel();
+const usage = setupUsagePanel();
 let view = 'food';
 function renderView() {
   const off = (view === 'food' && !moduleEnabled('m01')) || (view === 'ports' && !moduleEnabled('m02'));
   window.utilityPanel.setView(off ? 'off' : view);
   document.querySelector('#food-view').hidden = view !== 'food' || off;
   document.querySelector('#ports-view').hidden = view !== 'ports' || off;
+  document.querySelector('#usage-view').hidden = view !== 'usage';
   document.querySelector('#settings-view').hidden = view !== 'settings';
   document.querySelector('#module-off').hidden = !off;
   document.querySelector('#module-off-message').textContent = `${view === 'food' ? '먹이·변환' : '개발 포트'} 모듈이 꺼져 있어요.`;
-  for (const name of ['food', 'ports', 'settings']) document.querySelector(`#show-${name}`).setAttribute('aria-pressed', String(view === name));
-  document.querySelector('#panel-title').textContent = view === 'settings' ? '설정' : view === 'ports' ? '개발 포트' : '오늘의 먹이';
+  for (const name of ['food', 'ports', 'usage', 'settings']) document.querySelector(`#show-${name}`).setAttribute('aria-pressed', String(view === name));
+  document.querySelector('#panel-title').textContent = view === 'usage' ? 'AI 사용량' : view === 'settings' ? '설정' : view === 'ports' ? '개발 포트' : '오늘의 먹이';
 }
 function focusView() {
   if (view === 'food' && moduleEnabled('m01')) draft.focus({ preventScroll: true });
@@ -39,11 +42,12 @@ function showView(next) {
   view = next;
   renderView();
   document.querySelector('.content').scrollTo(0, 0);
-  if (next === 'ports') ports.refresh();
+  if (next === 'usage') usage.refresh();
+  else if (next === 'ports') ports.refresh();
   else if (next === 'food') refresh();
   focusView();
 }
-for (const name of ['food', 'ports', 'settings']) document.querySelector(`#show-${name}`).addEventListener('click', () => showView(name));
+for (const name of ['food', 'ports', 'usage', 'settings']) document.querySelector(`#show-${name}`).addEventListener('click', () => showView(name));
 document.querySelector('#enable-module').addEventListener('click', () => showView('settings'));
 let busy = false;
 let listVersion = 0;
@@ -162,9 +166,11 @@ document.addEventListener('keydown', event => {
     window.utilityPanel.close();
   }
 });
-window.utilityPanel.onOpen(() => {
+window.utilityPanel.onOpen(requested => {
+  if (requested === 'usage') { showView('usage'); return; }
   focusView();
-  if (view === 'ports') ports.refresh();
+  if (view === 'usage') usage.refresh();
+  else if (view === 'ports') ports.refresh();
   else if (view === 'food') refresh();
 });
 window.food.onSaved(({ count }) => {

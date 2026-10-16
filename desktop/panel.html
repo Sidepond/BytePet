@@ -31,6 +31,7 @@
         <nav class="panel-views" aria-label="패널 보기">
           <button id="show-food" type="button" aria-pressed="true" aria-controls="food-view">먹이·변환</button>
           <button id="show-ports" type="button" aria-pressed="false" aria-controls="ports-view">개발 포트</button>
+          <button id="show-usage" type="button" aria-pressed="false" aria-controls="usage-view">AI 사용량</button>
           <button id="show-settings" type="button" aria-pressed="false" aria-controls="settings-view">설정</button>
         </nav>
         <button id="close" type="button" aria-label="패널 닫기" title="닫기 (Esc)">×</button>
@@ -56,6 +57,15 @@
             <span class="module-toggle"><input id="show-ground" type="checkbox" role="switch" checked></span>
           </label>
         </div>
+        <h2 class="section-label feature-label">AI 사용량 배지</h2>
+        <div class="settings-group">
+          <label class="module-option" for="usage-mode"><strong>표시 방식</strong><select id="usage-mode"><option value="always">항상 표시</option><option value="hidden">숨기기</option></select></label>
+          <label class="module-option" for="usage-position"><strong>배지 위치</strong><select id="usage-position"><option value="top">위쪽</option><option value="left">왼쪽</option><option value="right">오른쪽</option></select></label>
+          <label class="module-option" for="usage-window"><strong>표시할 한도</strong><select id="usage-window"><option value="primary">단기</option><option value="secondary">주간</option></select></label>
+          <label class="module-option" for="usage-codex"><strong>Codex</strong><span class="module-toggle"><input id="usage-codex" type="checkbox" role="switch"></span></label>
+          <label class="module-option" for="usage-claude"><strong>Claude</strong><span class="module-toggle"><input id="usage-claude" type="checkbox" role="switch"></span></label>
+        </div>
+        <p id="usage-settings-status" class="settings-hint" role="status"></p>
         <h2 class="section-label feature-label">사용할 기능</h2>
         <div class="settings-group">
         <label class="module-option" for="module-m01">
@@ -123,6 +133,18 @@
         <ul id="food-list" aria-label="저장된 먹이"></ul>
         <p id="empty-shelf">저장된 먹이가 없습니다</p>
       </section>
+      </section>
+      <section id="usage-view" aria-label="AI 사용량" hidden>
+        <div class="shelf-header"><h2>구독 한도 사용률</h2><button id="refresh-usage" type="button">새로고침</button></div>
+        <div id="usage-providers"></div>
+        <p id="usage-status" class="settings-hint" role="status" aria-live="polite"></p>
+        <button id="connect-claude" type="button">Claude 연결</button>
+        <details class="usage-connection">
+          <summary>연결 안내</summary>
+          <p>Codex CLI의 ChatGPT 로그인으로 5분마다 조회합니다. 새로고침은 30초 간격으로 요청할 수 있어요.</p>
+          <p>Claude는 Pro·Max 구독의 Claude Code 상태줄에서 받은 값을 표시합니다. 연결 후 응답을 받아야 갱신되며, 앱을 사용하지 않을 때는 이전 값일 수 있어요.</p>
+          <p>연결하면 Claude 사용자 설정에 상태줄 연동을 추가합니다. 기존 상태줄 출력은 유지하고, 연결 해제 시 복원합니다. 프로젝트별 상태줄 설정이 우선하면 해당 설정을 확인해 주세요.</p>
+        </details>
       </section>
       <section id="ports-view" aria-label="개발 포트 목록" hidden>
         <div class="shelf-header"><h2>열린 포트</h2><button id="refresh-ports" type="button">새로고침</button></div>

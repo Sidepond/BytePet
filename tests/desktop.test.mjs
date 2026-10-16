@@ -16,6 +16,7 @@ const jwtToken = (payload, header = { alg: 'HS256', typ: 'JWT' }, signature = 'A
 async function profileFor(t) {
   const profile = await realpath(await mkdtemp(path.join(tmpdir(), 'bytepet-desktop-')));
   t.after(() => rm(profile, { recursive: true, force: true }));
+  await writeFile(path.join(profile, 'ai-usage.json'), JSON.stringify({ version: 1, preferences: { codex: false, claude: false, badgeMode: 'hidden', badgePosition: 'top', badgeWindow: 'primary' } }));
   return profile;
 }
 

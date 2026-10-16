@@ -11,9 +11,11 @@ function createUtilityPanel(pet, { appearanceStore, appearanceInitial, applyAppe
   let panel;
   let open = false;
   let ready = false;
+  let contentReady = false;
   let suspended = false;
-  const viewHeights = { food: 588, ports: 588, settings: 530, off: 298 };
+  const viewHeights = { food: 588, ports: 588, settings: 530, usage: 588, off: 298 };
   let view = 'food';
+  let requestedView = null;
   const appearance = createAppearanceService({
     ipcMain, store: appearanceStore, initial: appearanceInitial, getPet: () => pet, getPanel: () => panel, apply: applyAppearance,
   });
@@ -60,11 +62,12 @@ function createUtilityPanel(pet, { appearanceStore, appearanceInitial, applyAppe
     panel.setBounds(getPanelBounds(bounds, area, viewHeights[view], appearance.state().preferences));
   }
   function show() {
-    if (suspended || !ready || !open || !panel) return;
+    if (suspended || !ready || !contentReady || !open || !panel) return;
     reposition();
     panel.show();
     panel.focus();
-    panel.webContents.send('panel:opened');
+    panel.webContents.send('panel:opened', requestedView);
+    requestedView = null;
   }
   function hide() {
     open = false;
@@ -91,7 +94,7 @@ function createUtilityPanel(pet, { appearanceStore, appearanceInitial, applyAppe
     win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     win.webContents.on('will-navigate', event => event.preventDefault());
     win.once('ready-to-show', () => { ready = true; show(); });
-    win.on('closed', () => { panel = null; ready = false; open = false; publish(); });
+    win.on('closed', () => { panel = null; ready = false; contentReady = false; open = false; publish(); });
     win.loadFile(path.join(__dirname, 'panel.html')).catch(error => {
       console.error('Could not load BytePet panel:', error);
       if (!win.isDestroyed()) win.destroy();
@@ -112,7 +115,7 @@ function createUtilityPanel(pet, { appearanceStore, appearanceInitial, applyAppe
     if (from(event, panel) || from(event, pet)) hide();
   }
   function rendererReady(event) {
-    if (from(event, panel)) show();
+    if (from(event, panel)) { contentReady = true; show(); }
   }
   function changeView(event, next) {
     if (!from(event, panel) || typeof next !== 'string' || !Object.hasOwn(viewHeights, next)) return;
@@ -126,6 +129,13 @@ function createUtilityPanel(pet, { appearanceStore, appearanceInitial, applyAppe
   pet.webContents.on('did-finish-load', publish);
 
   return {
+    window: () => panel,
+    openUsage() {
+      if (suspended) return;
+      requestedView = 'usage'; view = 'usage'; open = true; publish();
+      if (!panel) create();
+      show();
+    },
     reposition,
     setSuspended(value) {
       if (suspended === value) return;

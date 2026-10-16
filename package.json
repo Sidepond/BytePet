@@ -24,10 +24,11 @@
     "sync:characters": "node scripts/sync-character-assets.mjs",
     "package:mac": "node scripts/package-macos.mjs",
     "test:package": "node --test tests/package.test.mjs",
-    "test": "node --test tests/pet.test.mjs tests/food.test.mjs tests/jwt.test.mjs tests/json.test.mjs tests/format.test.mjs tests/results.test.mjs tests/ports.test.mjs tests/terminate.test.mjs tests/modules.test.mjs tests/appearance.test.mjs",
+    "test": "node --test tests/pet.test.mjs tests/food.test.mjs tests/jwt.test.mjs tests/json.test.mjs tests/format.test.mjs tests/results.test.mjs tests/ports.test.mjs tests/terminate.test.mjs tests/modules.test.mjs tests/appearance.test.mjs tests/usage.test.mjs",
     "test:desktop": "node --test tests/desktop.test.mjs",
     "sprites:eating": "node scripts/generate-pixellab-eating.mjs",
-    "sprites:dragging": "node scripts/generate-pixellab-dragging.mjs"
+    "sprites:dragging": "node scripts/generate-pixellab-dragging.mjs",
+    "test:usage-desktop": "node --test tests/usage-desktop.test.mjs"
   },
   "devDependencies": {
     "@electron/packager": "20.3.0",
