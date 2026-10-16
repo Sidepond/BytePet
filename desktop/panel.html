@@ -8,6 +8,17 @@
     <link rel="stylesheet" href="panel.css">
   </head>
   <body>
+    <svg class="icon-definitions" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <symbol id="icon-paw" viewBox="0 0 24 24"><ellipse cx="6" cy="8" rx="2.3" ry="3"/><ellipse cx="12" cy="5" rx="2.3" ry="3"/><ellipse cx="18" cy="8" rx="2.3" ry="3"/><path d="M5 17c0-3 4-7 7-7s7 4 7 7c0 5-5 2-7 2s-7 3-7-2Z"/></symbol>
+        <symbol id="icon-folder" viewBox="0 0 48 48"><path d="M5 12q0-4 4-4h12l5 5h13q4 0 4 4v22H5Z" fill="#ddb67c" stroke="#b68b52" stroke-width="1.5"/><path d="M5 20h38l-3 19H8Z" fill="#efcf9b" stroke="#b68b52" stroke-width="1.5"/></symbol>
+        <symbol id="icon-file" viewBox="0 0 48 48"><path d="M11 4h19l9 9v29H11Z" fill="#fffdf7" stroke="currentColor" stroke-width="1.7"/><path d="M30 4v10h9" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M17 24h16M17 29h16M17 34h10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+        <symbol id="icon-image" viewBox="0 0 48 48"><rect x="6" y="8" width="36" height="33" rx="4" fill="#e8f2ee" stroke="currentColor" stroke-width="1.7"/><circle cx="17" cy="18" r="4" fill="#d4ad65"/><path d="m8 36 11-13 8 9 6-7 8 11Z" fill="#78a98e"/></symbol>
+        <symbol id="icon-code" viewBox="0 0 48 48"><path d="M11 4h19l9 9v29H11Z" fill="#f5f5fb" stroke="currentColor" stroke-width="1.7"/><path d="M30 4v10h9" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="m20 22-5 5 5 5m10-10 5 5-5 5m-5-12-3 20" fill="none" stroke="#6d79a3" stroke-width="2" stroke-linejoin="round"/></symbol>
+        <symbol id="icon-archive" viewBox="0 0 48 48"><path d="M8 13h32v28H8Z" fill="#e9c799" stroke="currentColor" stroke-width="1.7"/><path d="M5 8h38v9H5Z" fill="#f4dcba" stroke="currentColor" stroke-width="1.7"/><path d="M20 23h8v4h-8Z" fill="none" stroke="currentColor" stroke-width="1.7"/></symbol>
+      </defs>
+    </svg>
+
     <main role="dialog" aria-modal="false" aria-labelledby="panel-title">
       <svg class="house-roof" viewBox="0 0 340 90" preserveAspectRatio="none" aria-hidden="true" focusable="false">
         <defs>
@@ -26,10 +37,11 @@
         <circle class="attic-window" cx="170" cy="54" r="13"/>
         <path class="attic-divider" d="M170 41 V67 M157 54 H183"/>
       </svg>
-      <h1 id="panel-title" class="sr-only">먹이·변환</h1>
+      <h1 id="panel-title" class="sr-only">먹이</h1>
       <header class="toolbar">
         <nav class="panel-views" aria-label="패널 보기">
-          <button id="show-food" type="button" aria-pressed="true" aria-controls="food-view">먹이·변환</button>
+          <button id="show-food" type="button" aria-pressed="true" aria-controls="food-view">먹이</button>
+          <button id="show-convert" type="button" aria-pressed="false" aria-controls="convert-view">변환</button>
           <button id="show-ports" type="button" aria-pressed="false" aria-controls="ports-view">개발 포트</button>
           <button id="show-usage" type="button" aria-pressed="false" aria-controls="usage-view">AI 사용량</button>
           <button id="show-settings" type="button" aria-pressed="false" aria-controls="settings-view">설정</button>
@@ -96,29 +108,52 @@
           </div>
         </div>
       </section>
-      <section id="food-view" aria-label="먹이와 변환">
-      <div class="editor">
-        <label for="draft" class="sr-only">텍스트 먹이</label>
-        <textarea id="draft" spellcheck="false" placeholder="텍스트 붙여넣기
-또는 파일·사진을 드롭하세요" aria-describedby="draft-hint"></textarea>
-        <div class="utility-actions" aria-label="텍스트 도구">
-          <label for="input-format" class="sr-only">입력 형식</label>
-          <select id="input-format" aria-describedby="format-hint" title="입력 형식">
-            <option value="auto">자동 감지</option>
-            <option value="jwt">JWT</option>
-            <option value="json">JSON</option>
-          </select>
-          <button id="run-tool" type="button" aria-controls="jwt-result json-result" disabled>도구 실행</button>
+      <section id="food-view" aria-label="먹이와 보관함">
+        <div class="feeding-station">
+          <div class="station-heading"><h2>먹이 그릇</h2><span>텍스트 · 파일 · 사진</span></div>
+          <div class="food-bowl">
+            <label for="draft" class="sr-only">텍스트 먹이</label>
+            <textarea id="draft" spellcheck="false" placeholder="메모를 적거나, 파일을 놓아주세요" aria-describedby="draft-hint"></textarea>
+            <div class="bowl-base" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#icon-paw"/></svg></div>
+          </div>
+          <p id="draft-hint" class="sr-only">텍스트 1MB · 파일당 25MB · 한 번에 10개. 드롭한 파일은 바로 저장됩니다.</p>
+          <div class="feed-actions">
+            <button id="choose-files" type="button" title="파일당 25MB · 한 번에 10개">파일·사진 선택</button>
+            <button id="feed-text" type="button" title="텍스트를 로컬 보관함에 저장">먹이 주기</button>
+            <input id="files" type="file" multiple hidden>
+          </div>
+          <p id="feed-status" role="status" aria-live="polite"></p>
         </div>
-      </div>
-      <p id="draft-hint" class="sr-only">텍스트 1MB · 파일당 25MB · 한 번에 10개</p>
-      <p id="format-hint" role="status" aria-live="polite"></p>
-      <div class="feed-actions">
-        <button id="choose-files" type="button" title="파일당 25MB · 한 번에 10개">파일·사진 선택</button>
-        <button id="feed-text" type="button" title="텍스트를 로컬 보관함에 저장">먹이 주기</button>
-        <input id="files" type="file" multiple hidden>
-      </div>
-      <p id="feed-status" role="status" aria-live="polite"></p>
+        <section class="shelf" aria-labelledby="shelf-title">
+          <div class="shelf-header"><h2 id="shelf-title">보관함 <span id="shelf-count">0</span></h2><button id="open-folder" type="button">폴더 열기</button></div>
+          <div class="shelf-cabinet">
+            <ul id="food-list" aria-label="저장된 먹이"></ul>
+            <p id="empty-shelf"><svg viewBox="0 0 48 48" aria-hidden="true"><use href="#icon-folder"/></svg><span>아직 비어 있어요</span><small>먹이를 주면 여기에 차곡차곡 모여요</small></p>
+          </div>
+          <div id="shelf-selection" hidden>
+            <p id="selected-food-name"></p>
+            <div class="shelf-actions">
+              <button id="shelf-open" type="button">불러오기</button>
+              <button id="shelf-convert" type="button">변환으로 보내기</button>
+              <button id="shelf-reveal" type="button">위치</button>
+            </div>
+          </div>
+        </section>
+      </section>
+      <section id="convert-view" aria-label="텍스트 변환" hidden>
+        <div class="station-heading"><h2>변환 작업대</h2><span>JSON · JWT</span></div>
+        <div class="editor conversion-editor">
+          <label for="convert-draft" class="sr-only">변환할 텍스트</label>
+          <textarea id="convert-draft" spellcheck="false" placeholder="JSON 또는 JWT를 붙여넣으세요" aria-describedby="format-hint"></textarea>
+          <div class="utility-actions" aria-label="텍스트 도구">
+            <label for="input-format" class="sr-only">입력 형식</label>
+            <select id="input-format" aria-describedby="format-hint" title="입력 형식">
+              <option value="auto">자동 감지</option><option value="jwt">JWT</option><option value="json">JSON</option>
+            </select>
+            <button id="run-tool" type="button" aria-controls="jwt-result json-result" disabled>도구 실행</button>
+          </div>
+        </div>
+        <div class="conversion-caption"><p id="format-hint" role="status" aria-live="polite"></p><button id="send-to-food" type="button" title="입력 내용을 먹이 화면으로 옮깁니다. 저장은 먹이 주기로 완료하세요.">먹이로 보내기</button></div>
       <section id="jwt-result" aria-labelledby="jwt-title" tabindex="-1" hidden>
         <div class="shelf-header"><h2 id="jwt-title">JWT 해독 결과</h2><button id="close-jwt" type="button">결과 닫기</button></div>
         <p id="jwt-error" role="alert" hidden></p>
@@ -144,11 +179,6 @@
         <pre id="json-output" tabindex="0" aria-labelledby="json-title" hidden></pre>
         <div class="copy-actions"><button id="copy-json" type="button" disabled>결과 복사</button></div>
         <p id="json-copy-status" class="copy-status" role="status" aria-live="polite"></p>
-      </section>
-      <section class="shelf" aria-labelledby="shelf-title">
-        <div class="shelf-header"><h2 id="shelf-title">보관함</h2><button id="open-folder" type="button">폴더 열기</button></div>
-        <ul id="food-list" aria-label="저장된 먹이"></ul>
-        <p id="empty-shelf">저장된 먹이가 없습니다</p>
       </section>
       </section>
       <section id="usage-view" aria-label="AI 사용량" hidden>

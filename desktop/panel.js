@@ -7,41 +7,53 @@ import { setupJsonPanel } from './json-panel.js';
 import { setupFormatPanel } from './format-panel.js';
 import { setupPortsPanel } from './ports-panel.js';
 import { setupUsagePanel } from './usage-panel.js';
+import { setupFoodShelf } from './food-shelf.js';
 import { setupAppPreferences } from './app-preferences-panel.js';
 
 await Promise.all([modulesReady, appearanceReady, charactersReady]);
 const draft = document.querySelector('#draft');
-const jwt = setupJwtPanel(draft, () => json.clear());
-const json = setupJsonPanel(draft, () => jwt.clear());
+const convertDraft = document.querySelector('#convert-draft');
+const jwt = setupJwtPanel(convertDraft, () => json.clear());
+const json = setupJsonPanel(convertDraft, () => jwt.clear());
 function clearResults() { jwt.clear(); json.clear(); }
-const updateFormat = setupFormatPanel(draft, { jwt, json }, clearResults, () => moduleEnabled('m01'));
-function draftChanged() { clearResults(); updateFormat(); }
+const updateFormat = setupFormatPanel(convertDraft, { jwt, json }, clearResults, () => moduleEnabled('m01'));
+function draftChanged() { clearResults(); updateFormat(); syncSendToFood(); }
 const status = document.querySelector('#feed-status');
-const list = document.querySelector('#food-list');
 const files = document.querySelector('#files');
 const ports = setupPortsPanel();
 const usage = setupUsagePanel();
 const appPreferences = setupAppPreferences();
 let view = 'food';
+const shelf = setupFoodShelf({ enabled: () => moduleEnabled('m01'), feedback, isFoodView: () => view === 'food',
+  onText(text, destination) {
+    if (destination === 'convert') { convertDraft.value = text; draftChanged(); showView('convert'); }
+    else { draft.value = text; draft.focus(); }
+  },
+});
+const refresh = () => shelf.refresh();
+const labels = { food: '먹이', convert: '변환', ports: '개발 포트', usage: 'AI 사용량', settings: '설정' };
 function renderView() {
-  const off = (view === 'food' && !moduleEnabled('m01')) || (view === 'ports' && !moduleEnabled('m02'));
+  const off = (['food', 'convert'].includes(view) && !moduleEnabled('m01')) || (view === 'ports' && !moduleEnabled('m02'));
   window.utilityPanel.setView(off ? 'off' : view);
   document.querySelector('#food-view').hidden = view !== 'food' || off;
+  document.querySelector('#convert-view').hidden = view !== 'convert' || off;
   document.querySelector('#ports-view').hidden = view !== 'ports' || off;
   document.querySelector('#usage-view').hidden = view !== 'usage';
   document.querySelector('#settings-view').hidden = view !== 'settings';
   document.querySelector('#module-off').hidden = !off;
-  document.querySelector('#module-off-message').textContent = `${view === 'food' ? '먹이·변환' : '개발 포트'} 모듈이 꺼져 있어요.`;
-  for (const name of ['food', 'ports', 'usage', 'settings']) document.querySelector(`#show-${name}`).setAttribute('aria-pressed', String(view === name));
-  document.querySelector('#panel-title').textContent = view === 'usage' ? 'AI 사용량' : view === 'settings' ? '설정' : view === 'ports' ? '개발 포트' : '오늘의 먹이';
+  document.querySelector('#module-off-message').textContent = `${labels[view]} 모듈이 꺼져 있어요.`;
+  for (const name of Object.keys(labels)) document.querySelector(`#show-${name}`).setAttribute('aria-pressed', String(view === name));
+  document.querySelector('#panel-title').textContent = labels[view];
 }
 function focusView() {
   if (view === 'food' && moduleEnabled('m01')) draft.focus({ preventScroll: true });
+  else if (view === 'convert' && moduleEnabled('m01')) convertDraft.focus({ preventScroll: true });
   else if (view === 'settings') document.querySelector('#character-picker button[aria-pressed="true"]').focus();
   else document.querySelector(`#show-${view}`).focus({ preventScroll: true });
 }
 function showView(next) {
   view = next;
+  document.body.classList.remove('food-over');
   renderView();
   document.querySelector('.content').scrollTo(0, 0);
   if (next === 'usage') usage.refresh();
@@ -50,10 +62,9 @@ function showView(next) {
   else if (next === 'settings') appPreferences.refresh();
   focusView();
 }
-for (const name of ['food', 'ports', 'usage', 'settings']) document.querySelector(`#show-${name}`).addEventListener('click', () => showView(name));
+for (const name of Object.keys(labels)) document.querySelector(`#show-${name}`).addEventListener('click', () => showView(name));
 document.querySelector('#enable-module').addEventListener('click', () => showView('settings'));
 let busy = false;
-let listVersion = 0;
 let foodGeneration = 0;
 function feedback(text, error = false) {
   status.textContent = text;
@@ -83,58 +94,10 @@ async function consume(operation) {
     document.querySelector('#choose-files').disabled = false;
   }
 }
-async function refresh() {
-  if (!moduleEnabled('m01')) return;
-  const version = ++listVersion;
-  const result = await window.food.list();
-  if (version !== listVersion) return;
-  if (!result.ok) { feedback(result.error, true); return; }
-  list.replaceChildren();
-  document.querySelector('#empty-shelf').hidden = result.value.length > 0;
-  for (const item of result.value) {
-    const row = document.createElement('li');
-    row.dataset.id = item.id;
-    const name = document.createElement('span');
-    name.className = 'item-name';
-    name.textContent = item.name;
-    name.title = item.name;
-    const meta = document.createElement('p');
-    meta.className = 'item-meta';
-    const size = item.size < 1024 ? `${item.size} B` : `${(item.size / 1024).toFixed(1)} KB`;
-    meta.title = new Date(item.createdAt).toLocaleString('ko-KR');
-    meta.textContent = `${item.kind === 'text' ? '텍스트' : '파일'} · ${size}`;
-    const actions = document.createElement('div');
-    actions.className = 'item-actions';
-    function button(label, run) {
-      const control = document.createElement('button');
-      control.type = 'button';
-      control.textContent = label === '텍스트 불러오기' ? '불러오기' : label === '파일 열기' ? '열기' : '위치';
-      control.setAttribute('aria-label', label);
-      control.title = label;
-      control.addEventListener('click', async () => {
-        if (!moduleEnabled('m01')) return;
-        const current = foodGeneration;
-        try { const result = await run(); if (current === foodGeneration && !result.ok) feedback(result.error, true); }
-        catch { if (current === foodGeneration) feedback('항목을 열지 못했어요.', true); }
-      });
-      actions.append(control);
-    }
-    if (item.kind === 'text') button('텍스트 불러오기', async () => {
-      const current = foodGeneration;
-      const result = await window.food.readText(item.id);
-      if (current === foodGeneration && result.ok) { draft.value = result.value; draftChanged(); draft.focus(); }
-      return result;
-    });
-    else button('파일 열기', () => window.food.open(item.id));
-    button('폴더에서 보기', () => window.food.reveal(item.id));
-    row.append(name, meta, actions);
-    list.append(row);
-  }
-}
 document.querySelector('#feed-text').addEventListener('click', async () => {
   const text = draft.value;
   const result = await consume(() => window.food.saveText(text));
-  if (result?.ok && result.value.items.length && draft.value === text) { draft.value = ''; draftChanged(); }
+  if (result?.ok && result.value.items.length && draft.value === text) { draft.value = ''; }
 });
 document.querySelector('#choose-files').addEventListener('click', () => { if (moduleEnabled('m01')) files.click(); });
 files.addEventListener('change', () => {
@@ -150,17 +113,29 @@ document.querySelector('#open-folder').addEventListener('click', async () => {
 });
 enableFoodDrop(document.body, consume, () => moduleEnabled('m01') && view === 'food');
 document.addEventListener('paste', event => {
-  if (view !== 'food' || !moduleEnabled('m01')) return;
+  if (!['food', 'convert'].includes(view) || !moduleEnabled('m01')) return;
   const images = Array.from(event.clipboardData.files);
   if (images.length) {
     event.preventDefault();
+    if (view !== 'food') return;
     consume(() => window.food.saveFiles(images));
-  } else if (document.activeElement !== draft) {
+  } else {
+    const input = view === 'food' ? draft : convertDraft;
+    if (document.activeElement === input) return;
     event.preventDefault();
-    draft.value += event.clipboardData.getData('text/plain');
-    draftChanged();
-    draft.focus();
+    input.value += event.clipboardData.getData('text/plain');
+    if (view === 'convert') draftChanged();
+    input.focus();
   }
+});
+const sendToFood = document.querySelector('#send-to-food');
+function syncSendToFood() { sendToFood.disabled = !convertDraft.value.trim(); }
+convertDraft.addEventListener('input', syncSendToFood);
+syncSendToFood();
+document.querySelector('#send-to-food').addEventListener('click', () => {
+  if (!moduleEnabled('m01') || !convertDraft.value.trim()) return;
+  draft.value = convertDraft.value;
+  showView('food');
 });
 document.querySelector('#close').addEventListener('click', () => window.utilityPanel.close());
 document.addEventListener('keydown', event => {
@@ -190,7 +165,7 @@ function syncSettings() {
     document.querySelector(`#module-${key}`).disabled = settingBusy;
     document.querySelector(`#state-${key}`).textContent = moduleEnabled(key) ? 'ON' : 'OFF';
   }
-  document.querySelector('#show-food').title = moduleEnabled('m01') ? '먹이·변환' : '먹이·변환 꺼짐';
+  for (const name of ['food', 'convert']) document.querySelector(`#show-${name}`).title = `${labels[name]}${moduleEnabled('m01') ? '' : ' 꺼짐'}`;
   document.querySelector('#show-ports').title = moduleEnabled('m02') ? '개발 포트' : '개발 포트 꺼짐';
   if (moduleState().warning) {
     settingsStatus.classList.add('error');
@@ -200,10 +175,9 @@ function syncSettings() {
 onModulesChanged((next, previous) => {
   if (next.modules.m01 !== previous.modules.m01) {
     foodGeneration++;
-    listVersion++;
     clearResults();
     updateFormat();
-    list.replaceChildren();
+    shelf.clear();
     feedback('');
     files.value = '';
     busy = false;

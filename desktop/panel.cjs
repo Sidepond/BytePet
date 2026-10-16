@@ -14,8 +14,9 @@ function createUtilityPanel(pet, { appearanceStore, appearanceInitial, applyAppe
   let ready = false;
   let contentReady = false;
   let suspended = false;
-  const viewHeights = { food: 588, ports: 588, settings: 530, usage: 588, off: 298 };
-  let view = 'food';
+  // Keep the house stable across tabs, loading states and disabled modules.
+  const panelHeight = 588;
+  const views = new Set(['food', 'convert', 'ports', 'settings', 'usage', 'off']);
   let requestedView = null;
   const appearance = createAppearanceService({
     ipcMain, store: appearanceStore, initial: appearanceInitial, getPet: () => pet, getPanel: () => panel, apply: applyAppearance,
@@ -58,11 +59,11 @@ function createUtilityPanel(pet, { appearanceStore, appearanceInitial, applyAppe
     let bounds = pet.getBounds();
     const area = screen.getDisplayMatching(bounds).workArea;
     if (open) {
-      const next = getYardBoundsForPanel(bounds, area, viewHeights[view], appearance.state().preferences);
+      const next = getYardBoundsForPanel(bounds, area, panelHeight, appearance.state().preferences);
       if (Object.keys(next).some(key => next[key] !== bounds[key])) pet.setBounds(next);
       bounds = next;
     }
-    panel.setBounds(getPanelBounds(bounds, area, viewHeights[view], appearance.state().preferences));
+    panel.setBounds(getPanelBounds(bounds, area, panelHeight, appearance.state().preferences));
   }
   function show() {
     if (suspended || !ready || !contentReady || !open || !panel) return;
@@ -80,7 +81,7 @@ function createUtilityPanel(pet, { appearanceStore, appearanceInitial, applyAppe
   function create() {
     const bounds = pet.getBounds();
     const win = new BrowserWindow({
-      ...getPanelBounds(bounds, screen.getDisplayMatching(bounds).workArea, viewHeights[view], appearance.state().preferences),
+      ...getPanelBounds(bounds, screen.getDisplayMatching(bounds).workArea, panelHeight, appearance.state().preferences),
       title: 'BytePet 유틸리티', parent: pet, modal: false,
       frame: false, transparent: true, backgroundColor: '#00000000', hasShadow: false,
       show: false, resizable: false, maximizable: false, minimizable: false,
@@ -121,8 +122,7 @@ function createUtilityPanel(pet, { appearanceStore, appearanceInitial, applyAppe
     if (from(event, panel)) { contentReady = true; show(); }
   }
   function changeView(event, next) {
-    if (!from(event, panel) || typeof next !== 'string' || !Object.hasOwn(viewHeights, next)) return;
-    view = next;
+    if (!from(event, panel) || typeof next !== 'string' || !views.has(next)) return;
     reposition();
   }
   ipcMain.on('panel:view', changeView);
@@ -133,7 +133,7 @@ function createUtilityPanel(pet, { appearanceStore, appearanceInitial, applyAppe
 
   function openView(next) {
     if (suspended) return;
-    requestedView = next; view = next; open = true; publish();
+    requestedView = next; open = true; publish();
     if (!panel) create();
     show();
   }

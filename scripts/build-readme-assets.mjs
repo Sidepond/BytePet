@@ -63,11 +63,17 @@ try {
   await panel.locator('#draft').fill('오늘의 아이디어: 작업 공간에 작은 친구 한 마리.');
   await panel.locator('#feed-text').click();
   await panel.locator('#food-list li').first().waitFor();
-  await panel.locator('#files').setInputFiles({ name: '마멀레이드.png', mimeType: 'image/png', buffer: await readFile(path.join(output, 'marmalade.png')) });
-  await panel.waitForFunction(() => document.querySelectorAll('#food-list li').length === 2);
+  await panel.locator('#files').setInputFiles([
+    { name: '작업 노트.md', mimeType: 'text/markdown', buffer: Buffer.from('# 오늘의 작업\n메뉴 UI 다듬기') },
+    { name: '아이디어.txt', mimeType: 'text/plain', buffer: Buffer.from('작업 공간에 작은 친구 한 마리.') },
+    { name: 'settings.json', mimeType: 'application/json', buffer: Buffer.from('{"pet":"marmalade"}') },
+    { name: '마멀레이드.png', mimeType: 'image/png', buffer: await readFile(path.join(output, 'marmalade.png')) },
+  ]);
+  await panel.waitForFunction(() => document.querySelectorAll('#food-list li').length === 5);
   await capture('food-shelf.png');
 
-  await panel.locator('#draft').fill('{"name":"BytePet","friends":6,"ready":true}');
+  await panel.locator('#show-convert').click();
+  await panel.locator('#convert-draft').fill('{"name":"BytePet","friends":6,"ready":true}');
   await panel.locator('#input-format').selectOption('json');
   await panel.locator('#run-tool').click();
   await panel.locator('#json-output').waitFor();

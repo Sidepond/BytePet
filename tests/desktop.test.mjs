@@ -954,12 +954,14 @@ test('F05: text and original image files persist, and only successful saves trig
     app = await launch(profile);
     ({ pet, panel } = await openPanel(app));
     await panel.waitForFunction(() => document.querySelectorAll('#food-list li').length === 3);
+    await panel.locator('.file-tile[data-kind=note]').first().click();
     await panel.getByRole('button', { name: '텍스트 불러오기' }).click();
     assert.equal(await panel.locator('#draft').inputValue(), text);
     assert.notEqual(await pet.locator('canvas').getAttribute('data-state'), 'eating', 'restoring a list does not eat again');
     // User-initiated file opening resolves only a saved item, without launching an external app in the test.
     await app.evaluate(({ shell }) => { shell.openPath = async file => { globalThis.openedFood = file; return ''; }; });
-    await panel.getByRole('button', { name: '파일 열기', exact: true }).first().click();
+    await panel.locator('.file-tile[data-kind=image]').first().click();
+    await panel.getByRole('button', { name: '파일 열기', exact: true }).click();
     await waitUntil(() => app.evaluate(() => typeof globalThis.openedFood === 'string'));
     assert.ok((await app.evaluate(() => globalThis.openedFood)).startsWith(path.join(profile, 'food') + path.sep));
   } finally { await app.close(); }
@@ -1047,13 +1049,14 @@ test('F06: local JWT inspection, safe rendering, shelf restore, and stale-result
   const app = await launch(await profileFor(t));
   try {
     const { pet, panel } = await openPanel(app);
+    await panel.locator('#show-convert').click();
     const errors = [];
     const requests = [];
     panel.on('pageerror', error => errors.push(error.message));
     panel.on('request', request => { if (/^https?:/.test(request.url())) requests.push(request.url()); });
     const payload = { sub: '고양이 🐱', role: 'developer', exp: 4102444800, note: '<img src=x onerror="window.injected=true">' };
     const token = jwtToken(payload);
-    await panel.locator('#draft').fill(`Bearer ${token}`);
+    await panel.locator('#convert-draft').fill(`Bearer ${token}`);
     await runTool(panel, 'jwt');
     assert.deepEqual(JSON.parse(await panel.locator('#jwt-header').textContent()), { alg: 'HS256', typ: 'JWT' });
     assert.deepEqual(JSON.parse(await panel.locator('#jwt-payload').textContent()), payload);
@@ -1068,24 +1071,29 @@ test('F06: local JWT inspection, safe rendering, shelf restore, and stale-result
     await panel.screenshot({ path: `${root}/test-results/f06-jwt.png` });
     await panel.locator('#close-jwt').click();
     assert.equal(await panel.locator('#jwt-result').isVisible(), false);
-    assert.equal(await panel.locator('#draft').inputValue(), `Bearer ${token}`);
+    assert.equal(await panel.locator('#convert-draft').inputValue(), `Bearer ${token}`);
 
+    await panel.locator('#send-to-food').click();
     await panel.locator('#feed-text').click();
     await panel.waitForFunction(() => document.querySelector('#draft').value === '');
-    await panel.getByRole('button', { name: '텍스트 불러오기' }).click();
-    assert.equal(await panel.locator('#draft').inputValue(), `Bearer ${token}`);
+    await panel.locator('#show-food').click();
+    await panel.locator('.file-tile[data-kind=note]').first().click();
+    await panel.locator('#shelf-convert').click();
+    assert.equal(await panel.locator('#convert-draft').inputValue(), `Bearer ${token}`);
     await runTool(panel, 'jwt');
     assert.deepEqual(JSON.parse(await panel.locator('#jwt-payload').textContent()), payload);
     await panel.keyboard.press('Escape');
     await pet.evaluate(() => window.petPanel.toggle());
-    await panel.waitForFunction(() => document.activeElement?.id === 'draft');
+    await panel.waitForFunction(() => document.activeElement?.id === 'convert-draft');
     assert.equal(await panel.locator('#jwt-result').isVisible(), true);
-    await panel.locator('#draft').fill('different input');
+    await panel.locator('#convert-draft').fill('different input');
     assert.equal(await panel.locator('#jwt-result').isVisible(), false);
     assert.equal(await panel.locator('#jwt-payload').textContent(), '');
     await runTool(panel, 'jwt');
     assert.match(await panel.locator('#jwt-error').textContent(), /Header.Payload.Signature/);
-    await panel.getByRole('button', { name: '텍스트 불러오기' }).click();
+    await panel.locator('#show-food').click();
+    await panel.locator('.file-tile[data-kind=note]').first().click();
+    await panel.locator('#shelf-convert').click();
     assert.equal(await panel.locator('#jwt-result').isVisible(), false, 'loading a stored draft clears an earlier result');
     assert.deepEqual(errors, []);
     assert.deepEqual(requests, []);
@@ -1096,30 +1104,31 @@ test('F06: invalid tokens, missing/invalid expiration, unsigned tokens, and live
   const app = await launch(await profileFor(t));
   try {
     const { panel } = await openPanel(app);
+    await panel.locator('#show-convert').click();
     for (const [input, message] of [
       ['', /입력해/], ['a.b.c.d.e', /JWE/], ['e30._w.AA', /UTF-8/],
       [jwtToken([], { alg: 'HS256' }), /JSON 객체/],
     ]) {
-      await panel.locator('#draft').fill(input);
+      await panel.locator('#convert-draft').fill(input);
       await runTool(panel, 'jwt');
       assert.match(await panel.locator('#jwt-error').textContent(), message);
       assert.equal(await panel.locator('#jwt-output').isVisible(), false);
-      assert.equal(await panel.locator('#draft').inputValue(), input);
+      assert.equal(await panel.locator('#convert-draft').inputValue(), input);
     }
     for (const [payload, state] of [[{}, 'missing'], [{ exp: '123' }, 'invalid'], [{ exp: 0 }, 'expired']]) {
-      await panel.locator('#draft').fill(jwtToken(payload, { alg: 'none' }, ''));
+      await panel.locator('#convert-draft').fill(jwtToken(payload, { alg: 'none' }, ''));
       await runTool(panel, 'jwt');
       assert.equal(await panel.locator('#jwt-expiration').getAttribute('data-state'), state);
       assert.match(await panel.locator('#jwt-signature').textContent(), /서명 없음/);
       assert.deepEqual(JSON.parse(await panel.locator('#jwt-payload').textContent()), payload);
       assert.equal(await panel.locator('#jwt-error').isVisible(), false);
     }
-    await panel.locator('#draft').fill(jwtToken({ exp: Date.now() / 1000 + 2.5 }));
+    await panel.locator('#convert-draft').fill(jwtToken({ exp: Date.now() / 1000 + 2.5 }));
     await runTool(panel, 'jwt');
     assert.equal(await panel.locator('#jwt-expiration').getAttribute('data-state'), 'unexpired');
     await panel.waitForFunction(() => document.querySelector('#jwt-expiration').dataset.state === 'expired');
     // A failed decode must remove all previous output, not leave a plausible old payload.
-    await panel.locator('#draft').fill('broken');
+    await panel.locator('#convert-draft').fill('broken');
     await runTool(panel, 'jwt');
     assert.equal(await panel.locator('#jwt-payload').textContent(), '');
     assert.equal(await panel.locator('#jwt-output').isVisible(), false);
@@ -1130,17 +1139,18 @@ test('F07: lossless local JSON formatting, shelf restore, and tool switching', {
   const app = await launch(await profileFor(t));
   try {
     const { pet, panel } = await openPanel(app);
+    await panel.locator('#show-convert').click();
     const errors = [];
     const requests = [];
     panel.on('pageerror', error => errors.push(error.message));
     panel.on('request', request => { if (/^https?:/.test(request.url())) requests.push(request.url()); });
     const input = '{"name":"고양이 🐱","id":900719925474099312345,"tags":["pet","dev"],"html":"<img src=x onerror=alert(1)>"}';
-    await panel.locator('#draft').fill(input);
+    await panel.locator('#convert-draft').fill(input);
     await runTool(panel, 'json');
     const formatted = await panel.locator('#json-output').textContent();
     assert.match(formatted, /\n  "name": "고양이 🐱",\n/);
     assert.match(formatted, /900719925474099312345/);
-    assert.equal(await panel.locator('#draft').inputValue(), input);
+    assert.equal(await panel.locator('#convert-draft').inputValue(), input);
     assert.equal(await panel.locator('#json-output img').count(), 0);
     assert.equal((await panel.evaluate(() => window.food.list())).value.length, 0);
     assert.notEqual(await pet.locator('canvas').getAttribute('data-state'), 'eating');
@@ -1149,7 +1159,7 @@ test('F07: lossless local JSON formatting, shelf restore, and tool switching', {
     await panel.screenshot({ path: `${root}/test-results/f07-json.png` });
     await panel.keyboard.press('Escape');
     await pet.evaluate(() => window.petPanel.toggle());
-    await panel.waitForFunction(() => document.activeElement?.id === 'draft');
+    await panel.waitForFunction(() => document.activeElement?.id === 'convert-draft');
     assert.equal(await panel.locator('#json-output').textContent(), formatted);
     await runTool(panel, 'jwt');
     assert.equal(await panel.locator('#json-result').isVisible(), false);
@@ -1159,19 +1169,25 @@ test('F07: lossless local JSON formatting, shelf restore, and tool switching', {
     assert.equal(await panel.locator('#json-output').textContent(), formatted);
     await panel.locator('#close-json').click();
     assert.equal(await panel.locator('#json-result').isVisible(), false);
-    assert.equal(await panel.locator('#draft').inputValue(), input);
+    assert.equal(await panel.locator('#convert-draft').inputValue(), input);
     await runTool(panel, 'json');
+    await panel.locator('#send-to-food').click();
     await panel.locator('#feed-text').click();
     await panel.waitForFunction(() => document.querySelector('#draft').value === '');
     assert.equal(await panel.locator('#json-result').isVisible(), false);
-    await panel.getByRole('button', { name: '텍스트 불러오기' }).click();
-    assert.equal(await panel.locator('#draft').inputValue(), input);
+    await panel.locator('#show-food').click();
+    await panel.locator('.file-tile[data-kind=note]').first().click();
+    await panel.locator('#shelf-convert').click();
+    assert.equal(await panel.locator('#convert-draft').inputValue(), input);
     await runTool(panel, 'json');
     assert.equal(await panel.locator('#json-output').textContent(), formatted);
-    await panel.getByRole('button', { name: '텍스트 불러오기' }).click();
+    await panel.locator('#show-food').click();
+    await panel.locator('.file-tile[data-kind=note]').first().click();
+    await panel.locator('#shelf-convert').click();
     assert.equal(await panel.locator('#json-result').isVisible(), false);
     await runTool(panel, 'json');
-    await panel.locator('#draft').fill('null');
+    await panel.locator('#show-convert').click();
+    await panel.locator('#convert-draft').fill('null');
     assert.equal(await panel.locator('#json-result').isVisible(), false);
     await runTool(panel, 'json');
     assert.equal(await panel.locator('#json-output').textContent(), 'null');
@@ -1184,40 +1200,41 @@ test('F07: JSON errors identify and select original positions, clear stale outpu
   const app = await launch(await profileFor(t));
   try {
     const { panel } = await openPanel(app);
-    await panel.locator('#draft').fill('{"valid":true}');
+    await panel.locator('#show-convert').click();
+    await panel.locator('#convert-draft').fill('{"valid":true}');
     await runTool(panel, 'json');
     const input = '{\n  "name": "고양이 🐱",\n  "items": [1, 2,]\n}';
-    await panel.locator('#draft').fill(input);
+    await panel.locator('#convert-draft').fill(input);
     await runTool(panel, 'json');
     assert.match(await panel.locator('#json-error').textContent(), /3줄 18열.*쉼표/);
     assert.equal(await panel.locator('#json-output').textContent(), '');
     assert.equal(await panel.locator('#json-output').isVisible(), false);
-    assert.equal(await panel.locator('#draft').inputValue(), input);
+    assert.equal(await panel.locator('#convert-draft').inputValue(), input);
     await panel.screenshot({ path: `${root}/test-results/f07-error.png` });
     await panel.locator('#json-error-location').click();
-    assert.deepEqual(await panel.locator('#draft').evaluate(el => ({ start: el.selectionStart, end: el.selectionEnd, focused: document.activeElement === el })), {
+    assert.deepEqual(await panel.locator('#convert-draft').evaluate(el => ({ start: el.selectionStart, end: el.selectionEnd, focused: document.activeElement === el })), {
       start: input.indexOf(']'), end: input.indexOf(']') + 1, focused: true,
     });
     const long = '[\n' + '  1,\n'.repeat(30) + ']';
-    await panel.locator('#draft').fill(long);
+    await panel.locator('#convert-draft').fill(long);
     await runTool(panel, 'json');
     await panel.locator('#json-error-location').click();
-    assert.equal(await panel.locator('#draft').evaluate(el => el.selectionStart), long.length - 1);
-    await panel.waitForFunction(() => document.querySelector('#draft').scrollTop > 0);
-    await panel.locator('#draft').fill('[1,');
+    assert.equal(await panel.locator('#convert-draft').evaluate(el => el.selectionStart), long.length - 1);
+    await panel.waitForFunction(() => document.querySelector('#convert-draft').scrollTop > 0);
+    await panel.locator('#convert-draft').fill('[1,');
     await runTool(panel, 'json');
     assert.match(await panel.locator('#json-error').textContent(), /1줄 4열.*끝났/);
     await panel.locator('#json-error-location').click();
-    assert.equal(await panel.locator('#draft').evaluate(el => el.selectionStart), 3);
-    await panel.locator('#draft').fill('['.repeat(129) + '0' + ']'.repeat(129));
+    assert.equal(await panel.locator('#convert-draft').evaluate(el => el.selectionStart), 3);
+    await panel.locator('#convert-draft').fill('['.repeat(129) + '0' + ']'.repeat(129));
     await runTool(panel, 'json');
     assert.match(await panel.locator('#json-error').textContent(), /128단계/);
     // Programmatic fill exercises the UI limit without spending time on a megabyte of keystrokes.
-    await panel.locator('#draft').evaluate(el => { el.value = '"' + 'x'.repeat(1024 * 1024) + '"'; el.dispatchEvent(new Event('input')); });
+    await panel.locator('#convert-draft').evaluate(el => { el.value = '"' + 'x'.repeat(1024 * 1024) + '"'; el.dispatchEvent(new Event('input')); });
     await runTool(panel, 'json');
     assert.match(await panel.locator('#json-error').textContent(), /1MB/);
     assert.equal(await panel.locator('#json-error-location').isVisible(), false);
-    await panel.locator('#draft').fill('[true, false, null]');
+    await panel.locator('#convert-draft').fill('[true, false, null]');
     await runTool(panel, 'json');
     assert.equal(await panel.locator('#json-error').isVisible(), false);
     assert.equal(await panel.locator('#json-output').textContent(), '[\n  true,\n  false,\n  null\n]');
@@ -1228,12 +1245,13 @@ test('F08: automatic routing, explicit overrides, unknown input, and result clea
   const app = await launch(await profileFor(t));
   try {
     const { pet, panel } = await openPanel(app);
+    await panel.locator('#show-convert').click();
     const mode = panel.locator('#input-format');
     const run = panel.locator('#run-tool');
     const hint = panel.locator('#format-hint');
     assert.equal(await mode.inputValue(), 'auto');
     assert.equal(await run.isDisabled(), true);
-    await panel.locator('#draft').fill('{"hello":"고양이 🐱"}');
+    await panel.locator('#convert-draft').fill('{"hello":"고양이 🐱"}');
     assert.equal(await hint.getAttribute('data-format'), 'json');
     assert.equal(await run.textContent(), 'JSON 정리');
     assert.equal(await panel.locator('#json-result').isVisible(), false);
@@ -1245,32 +1263,32 @@ test('F08: automatic routing, explicit overrides, unknown input, and result clea
     assert.equal(await panel.locator('#json-result').isVisible(), false);
     await run.click();
     assert.equal(await panel.locator('#jwt-error').isVisible(), true);
-    await panel.locator('#draft').fill('[1,2]');
+    await panel.locator('#convert-draft').fill('[1,2]');
     assert.equal(await mode.inputValue(), 'jwt', 'manual mode survives editing');
     assert.equal(await run.textContent(), 'JWT 해독');
     assert.equal(await panel.locator('#jwt-result').isVisible(), false);
     await panel.keyboard.press('Escape');
     await pet.evaluate(() => window.petPanel.toggle());
-    await panel.waitForFunction(() => document.activeElement?.id === 'draft');
+    await panel.waitForFunction(() => document.activeElement?.id === 'convert-draft');
     assert.equal(await mode.inputValue(), 'jwt', 'manual mode survives hiding the panel');
     await mode.selectOption('auto');
     assert.equal(await hint.getAttribute('data-format'), 'json');
     await run.click();
     assert.equal(await panel.locator('#json-output').textContent(), '[\n  1,\n  2\n]');
     const token = jwtToken({ sub: 'F08', exp: 4102444800 });
-    await panel.locator('#draft').fill(`Bearer ${token}`);
+    await panel.locator('#convert-draft').fill(`Bearer ${token}`);
     assert.equal(await hint.getAttribute('data-format'), 'jwt');
     assert.equal(await panel.locator('#json-result').isVisible(), false);
     await run.click();
     assert.match(await panel.locator('#jwt-payload').textContent(), /F08/);
-    await panel.locator('#draft').fill('[1,]');
+    await panel.locator('#convert-draft').fill('[1,]');
     await run.click();
     assert.match(await panel.locator('#json-error').textContent(), /쉼표/);
-    await panel.locator('#draft').fill('Bearer invalid');
+    await panel.locator('#convert-draft').fill('Bearer invalid');
     await run.click();
     assert.equal(await panel.locator('#jwt-error').isVisible(), true);
     for (const text of ['ordinary note', 'photo.backup.png', 'https://example.com']) {
-      await panel.locator('#draft').fill(text);
+      await panel.locator('#convert-draft').fill(text);
       assert.equal(await run.isDisabled(), true);
       assert.match(await hint.textContent(), /직접 선택/);
       assert.equal(await panel.locator('#jwt-result').isVisible(), false);
@@ -1280,12 +1298,12 @@ test('F08: automatic routing, explicit overrides, unknown input, and result clea
     await run.click();
     assert.equal(await panel.locator('#json-error').isVisible(), true);
     await mode.selectOption('auto');
-    await panel.locator('#draft').fill('');
+    await panel.locator('#convert-draft').fill('');
     assert.equal(await run.isDisabled(), true);
-    await panel.locator('#draft').evaluate(el => { el.value = '한'.repeat(400000); el.dispatchEvent(new Event('input')); });
+    await panel.locator('#convert-draft').evaluate(el => { el.value = '한'.repeat(400000); el.dispatchEvent(new Event('input')); });
     assert.equal(await run.isDisabled(), true);
     assert.match(await hint.textContent(), /1MB/);
-    await panel.locator('#draft').fill('{"name":"BytePet","features":["JWT","JSON"]}');
+    await panel.locator('#convert-draft').fill('{"name":"BytePet","features":["JWT","JSON"]}');
     await mkdir(path.join(root, 'test-results'), { recursive: true });
     await panel.screenshot({ path: `${root}/test-results/f08-auto.png` });
   } finally { await app.close(); }
@@ -1295,20 +1313,26 @@ test('F08: shelf loading, paste, save reset, and composition update the selected
   const app = await launch(await profileFor(t));
   try {
     const { panel } = await openPanel(app);
+    await panel.locator('#show-convert').click();
     const errors = [];
     panel.on('pageerror', error => errors.push(error.message));
-    const draft = panel.locator('#draft');
+    const draft = panel.locator('#convert-draft');
     const run = panel.locator('#run-tool');
     const hint = panel.locator('#format-hint');
     await draft.fill('{"restored":true}');
+    await panel.locator('#send-to-food').click();
     await panel.locator('#feed-text').click();
     await panel.waitForFunction(() => document.querySelector('#draft').value === '');
+    await panel.locator('#show-convert').click();
+    await draft.fill('');
     assert.equal(await run.isDisabled(), true);
     assert.equal(await hint.getAttribute('data-format'), '');
     await draft.fill(jwtToken({ sub: 'temporary' }));
     assert.equal(await hint.getAttribute('data-format'), 'jwt');
     await run.click();
-    await panel.getByRole('button', { name: '텍스트 불러오기' }).click();
+    await panel.locator('#show-food').click();
+    await panel.locator('.file-tile[data-kind=note]').first().click();
+    await panel.locator('#shelf-convert').click();
     assert.equal(await hint.getAttribute('data-format'), 'json');
     assert.equal(await panel.locator('#jwt-result').isVisible(), false);
     await run.click();
@@ -1347,6 +1371,7 @@ test('F09: JSON and JWT buttons copy exact results to the native clipboard only 
   const app = await launch(await profileFor(t));
   try {
     const { pet, panel } = await openPanel(app);
+    await panel.locator('#show-convert').click();
     // Keep all original clipboard formats inside the test process, never in test output.
     await app.evaluate(async ({ clipboard, ClipboardItem }) => {
       const snapshot = await clipboard.read();
@@ -1358,7 +1383,7 @@ test('F09: JSON and JWT buttons copy exact results to the native clipboard only 
       clipboard.writeText = async text => { await write(text); globalThis.copyWrites.push(text); };
     });
     const input = '{"id":900719925474099312345,"name":"고양이 🐱"}';
-    await panel.locator('#draft').fill(input);
+    await panel.locator('#convert-draft').fill(input);
     await panel.locator('#run-tool').click();
     assert.deepEqual(await app.evaluate(() => globalThis.copyWrites), []);
     const expected = await panel.locator('#json-output').textContent();
@@ -1366,11 +1391,11 @@ test('F09: JSON and JWT buttons copy exact results to the native clipboard only 
     await panel.waitForFunction(() => document.querySelector('#json-copy-status').textContent.includes('복사했어요'));
     assert.equal(await app.evaluate(async ({ clipboard }) => await clipboard.readText()), expected);
     assert.match(expected, /900719925474099312345/);
-    assert.equal(await panel.locator('#draft').inputValue(), input);
+    assert.equal(await panel.locator('#convert-draft').inputValue(), input);
     assert.equal((await panel.evaluate(() => window.food.list())).value.length, 0);
     await panel.screenshot({ path: `${root}/test-results/f09-copy.png` });
     const payload = { sub: '복사 테스트', exp: 4102444800 };
-    await panel.locator('#draft').fill(jwtToken(payload));
+    await panel.locator('#convert-draft').fill(jwtToken(payload));
     await panel.locator('#run-tool').click();
     const header = JSON.parse(await panel.locator('#jwt-header').textContent());
     for (const [selector, value] of [['#copy-jwt-header', header], ['#copy-jwt-payload', payload], ['#copy-jwt-all', { header, payload }]]) {
@@ -1379,7 +1404,7 @@ test('F09: JSON and JWT buttons copy exact results to the native clipboard only 
       assert.equal(await app.evaluate(async ({ clipboard }) => await clipboard.readText()), JSON.stringify(value, null, 2));
     }
     assert.equal((await app.evaluate(() => globalThis.copyWrites)).length, 4);
-    await panel.locator('#draft').fill('Bearer broken');
+    await panel.locator('#convert-draft').fill('Bearer broken');
     assert.equal(await panel.locator('#copy-jwt-header').isDisabled(), true);
     await panel.locator('#run-tool').click();
     assert.equal(await panel.locator('#copy-jwt-all').isDisabled(), true);
@@ -1402,8 +1427,9 @@ test('F09: copy failures and late responses preserve current results and permit 
   const app = await launch(await profileFor(t));
   try {
     const { panel } = await openPanel(app);
+    await panel.locator('#show-convert').click();
     await app.evaluate(({ clipboard }) => { clipboard.writeText = async () => { throw new Error('mock clipboard failure'); }; });
-    await panel.locator('#draft').fill('{"keep":true}');
+    await panel.locator('#convert-draft').fill('{"keep":true}');
     await panel.locator('#run-tool').click();
     const expected = await panel.locator('#json-output').textContent();
     await panel.locator('#copy-json').click();
@@ -1414,7 +1440,8 @@ test('F09: copy failures and late responses preserve current results and permit 
     await panel.locator('#copy-json').click();
     assert.equal(await panel.locator('#copy-json').isDisabled(), true);
     await waitUntil(() => app.evaluate(() => typeof globalThis.finishCopy === 'function'));
-    await panel.locator('#draft').fill('null');
+    await panel.locator('#show-convert').click();
+    await panel.locator('#convert-draft').fill('null');
     await panel.locator('#run-tool').click();
     assert.equal(await panel.locator('#json-copy-status').textContent(), '');
     await app.evaluate(() => globalThis.finishCopy());
@@ -1434,8 +1461,9 @@ test('F09: chewing, success/failure, reduced motion, and newer feeding return to
   const app = await launch(await profileFor(t));
   try {
     const { pet, panel } = await openPanel(app);
+    await panel.locator('#show-convert').click();
     await pet.emulateMedia({ reducedMotion: 'no-preference' });
-    await panel.locator('#draft').fill('{"happy":true}');
+    await panel.locator('#convert-draft').fill('{"happy":true}');
     await panel.locator('#run-tool').click();
     await pet.waitForFunction(() => document.querySelector('canvas').dataset.state === 'processing');
     const chew = await pet.locator('canvas').evaluate(canvas => canvas.toDataURL());
@@ -1444,7 +1472,7 @@ test('F09: chewing, success/failure, reduced motion, and newer feeding return to
     await pet.screenshot({ path: `${root}/test-results/f09-success.png`, omitBackground: true });
     await pet.waitForFunction(() => document.querySelector('canvas').dataset.state === 'idle');
     await pet.emulateMedia({ reducedMotion: 'reduce' });
-    await panel.locator('#draft').fill('[1,]');
+    await panel.locator('#convert-draft').fill('[1,]');
     await panel.locator('#run-tool').click();
     await pet.waitForFunction(() => document.querySelector('canvas').dataset.state === 'processing');
     const still = await pet.locator('canvas').evaluate(canvas => canvas.toDataURL());
@@ -1460,15 +1488,17 @@ test('F09: chewing, success/failure, reduced motion, and newer feeding return to
     // A newer save takes over the pet; the older conversion timers cannot reset it.
     await panel.locator('#run-tool').click();
     await pet.waitForFunction(() => document.querySelector('canvas').dataset.state === 'processing');
+    await panel.locator('#send-to-food').click();
     await panel.locator('#feed-text').click();
     await pet.waitForFunction(() => document.querySelector('canvas').dataset.state === 'eating');
     await pet.waitForTimeout(850);
     assert.equal(await pet.locator('canvas').getAttribute('data-state'), 'eating');
     await pet.waitForFunction(() => document.querySelector('canvas').dataset.state === 'idle');
-    await panel.locator('#draft').fill('null');
+    await panel.locator('#show-convert').click();
+    await panel.locator('#convert-draft').fill('null');
     await panel.locator('#run-tool').click();
     await pet.waitForFunction(() => document.querySelector('canvas').dataset.state === 'processing');
-    await panel.locator('#draft').fill('[bad]');
+    await panel.locator('#convert-draft').fill('[bad]');
     await panel.locator('#run-tool').click();
     await pet.waitForFunction(() => document.querySelector('canvas').dataset.state === 'failure');
     await pet.waitForFunction(() => document.querySelector('canvas').dataset.state === 'idle');
@@ -1483,10 +1513,11 @@ test('F10: real TCP listeners show port, PID, name and address; refresh reflects
   const app = await launch(await profileFor(t));
   try {
     const { pet, panel } = await openPanel(app);
+    await panel.locator('#show-convert').click();
     const errors = [];
     panel.on('pageerror', error => errors.push(error.message));
     const input = '{"keep":"my draft"}';
-    await panel.locator('#draft').fill(input);
+    await panel.locator('#convert-draft').fill(input);
     await panel.locator('#run-tool').click();
     const result = await panel.locator('#json-output').textContent();
     await panel.locator('#show-ports').click();
@@ -1508,10 +1539,10 @@ test('F10: real TCP listeners show port, PID, name and address; refresh reflects
     await pet.evaluate(() => window.petPanel.toggle());
     await panel.waitForFunction(() => document.activeElement?.id === 'show-ports');
     assert.equal(await panel.locator('#ports-view').isVisible(), true);
-    await panel.locator('#show-food').click();
-    assert.equal(await panel.locator('#draft').inputValue(), input);
+    await panel.locator('#show-convert').click();
+    assert.equal(await panel.locator('#convert-draft').inputValue(), input);
     assert.equal(await panel.locator('#json-output').textContent(), result);
-    assert.equal(await panel.locator('#draft').evaluate(el => document.activeElement === el), true);
+    assert.equal(await panel.locator('#convert-draft').evaluate(el => document.activeElement === el), true);
     assert.deepEqual(errors, []);
   } finally { await app.close(); }
 });
@@ -1787,7 +1818,8 @@ test('F13: module switches stop food tools and timers, retain drafts and shelf, 
     const saved = await panel.evaluate(() => window.food.saveText('keep this food'));
     assert.equal(saved.ok, true);
     const token = jwtToken({ exp: Math.floor(Date.now() / 1000) + 300 });
-    await panel.locator('#draft').fill(token);
+    await panel.locator('#show-convert').click();
+    await panel.locator('#convert-draft').fill(token);
     await panel.locator('#run-tool').click();
     assert.equal(await panel.evaluate(() => window.moduleIntervals.size), 1);
     await setModule(panel, 'm01', false);
@@ -1807,13 +1839,13 @@ test('F13: module switches stop food tools and timers, retain drafts and shelf, 
     });
     await panel.locator('#show-food').click();
     assert.equal(await panel.locator('#module-off').isVisible(), true);
-    assert.equal(await panel.locator('#draft').inputValue(), token);
+    assert.equal(await panel.locator('#convert-draft').inputValue(), token);
     await panel.locator('#enable-module').click();
     await panel.screenshot({ path: `${root}/test-results/f13-settings.png` });
     await setModule(panel, 'm01', true);
     await panel.locator('#show-food').click();
     await panel.waitForFunction(() => document.querySelectorAll('#food-list li').length === 1);
-    assert.equal(await panel.locator('#draft').inputValue(), token);
+    assert.equal(await panel.locator('#convert-draft').inputValue(), token);
     assert.equal(await panel.evaluate(() => window.moduleIntervals.size), 0, 'old JWT result and timer do not resume');
     assert.equal((await panel.evaluate(() => window.food.list())).value.length, 1);
     await setModule(panel, 'm02', false);
@@ -1963,7 +1995,94 @@ test('F13: disabling ports aborts a pending confirmation and ignores stale list 
   } finally { await app.close(); }
 });
 
-test('Panel: compact views resize within the display, preserve drafts, and keep navigation reachable', { timeout: 30000 }, async t => {
+test('Panel: separate drafts, icon grid navigation, and fixed bounds through port loading and failures', { timeout: 30000 }, async t => {
+  const app = await launch(await profileFor(t));
+  try {
+    const { panel } = await openPanel(app);
+    const errors = [];
+    panel.on('pageerror', error => errors.push(error.message));
+    const houseBounds = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(win => win.getTitle() === 'BytePet 유틸리티').getBounds());
+    const initial = await houseBounds();
+    await panel.locator('#draft').fill('아직 저장하지 않은 메모');
+    await panel.locator('#show-convert').click();
+    await panel.locator('#convert-draft').fill('{"separate":true}');
+    await panel.locator('#run-tool').click();
+    await panel.locator('#show-food').click();
+    assert.equal(await panel.locator('#draft').inputValue(), '아직 저장하지 않은 메모');
+    await panel.evaluate(async () => {
+      for (let i = 0; i < 9; i++) await window.food.saveText(`{"item":${i}}`);
+    });
+    await panel.locator('#files').setInputFiles([
+      { name: 'picture.png', mimeType: 'image/png', buffer: Buffer.from('test image') },
+      { name: 'config.json', mimeType: 'application/json', buffer: Buffer.from('{}') },
+      { name: '<img src=x onerror=alert(1)>.txt', mimeType: 'text/plain', buffer: Buffer.from('safe filename') },
+    ]);
+    await panel.waitForFunction(() => document.querySelectorAll('.file-tile').length === 12);
+    assert.equal(await panel.locator('#food-list img').count(), 0);
+    const layout = await panel.locator('.file-tile').evaluateAll(tiles => tiles.slice(0, 4).map(tile => ({ x: tile.offsetLeft, y: tile.offsetTop })));
+    assert.equal(layout[0].y, layout[2].y);
+    assert.ok(layout[0].x < layout[1].x && layout[1].x < layout[2].x);
+    assert.ok(layout[3].y > layout[0].y);
+    assert.equal(await panel.locator('.file-tile[data-kind=image] svg use').getAttribute('href'), '#icon-image');
+    assert.equal(await panel.locator('.file-tile[data-kind=code] svg use').getAttribute('href'), '#icon-code');
+    await panel.locator('.file-tile').first().click();
+    assert.equal(await panel.locator('#shelf-convert').isVisible(), false, 'files do not claim text conversion support');
+    await panel.keyboard.press('ArrowDown');
+    assert.equal(await panel.locator('.file-tile').nth(3).getAttribute('aria-pressed'), 'true');
+    await panel.keyboard.press('End');
+    assert.equal(await panel.locator('.file-tile').last().evaluate(el => el === document.activeElement), true);
+    await panel.keyboard.press('Enter');
+    await panel.waitForFunction(() => document.querySelector('#draft').value === '{"item":0}');
+    await panel.locator('#show-convert').click();
+    assert.equal(await panel.locator('#convert-draft').inputValue(), '{"separate":true}');
+    assert.equal(JSON.parse(await panel.locator('#json-output').textContent()).separate, true);
+    await panel.locator('#show-food').click();
+    await panel.locator('.file-tile[data-kind=note]').first().dblclick();
+    await panel.waitForFunction(() => document.querySelector('#draft').value === '{"item":8}');
+    await panel.locator('#shelf-convert').click();
+    assert.equal(await panel.locator('#convert-draft').inputValue(), '{"item":8}');
+    assert.equal(await panel.locator('#json-result').isVisible(), false);
+    assert.equal(await panel.locator('#show-convert').getAttribute('aria-pressed'), 'true');
+    assert.equal((await panel.evaluate(() => window.food.list())).value.length, 12, 'loading and converting never save again');
+
+    await app.evaluate(({ ipcMain }) => {
+      ipcMain.removeHandler('ports:list');
+      ipcMain.handle('ports:list', () => new Promise(resolve => { globalThis.finishMenuPorts = resolve; }));
+    });
+    await panel.locator('#show-ports').click();
+    await waitUntil(() => app.evaluate(() => typeof globalThis.finishMenuPorts === 'function'));
+    assert.equal(await panel.locator('#port-list').getAttribute('aria-busy'), 'true');
+    assert.deepEqual(await houseBounds(), initial, 'port loading keeps position and size');
+    await app.evaluate(() => globalThis.finishMenuPorts({ ok: false, error: '테스트 조회 실패' }));
+    await panel.waitForFunction(() => document.querySelector('#port-status').classList.contains('error'));
+    assert.deepEqual(await houseBounds(), initial, 'port failure keeps position and size');
+    await app.evaluate(() => { globalThis.finishMenuPorts = null; });
+    await panel.locator('#refresh-ports').click();
+    await waitUntil(() => app.evaluate(() => typeof globalThis.finishMenuPorts === 'function'));
+    await app.evaluate(() => globalThis.finishMenuPorts({ ok: true, value: { items: [], checkedAt: Date.now() } }));
+    await panel.locator('#empty-ports').waitFor();
+    assert.deepEqual(await houseBounds(), initial, 'empty port list keeps position and size');
+    for (const name of ['settings', 'usage', 'convert', 'food']) {
+      await panel.locator(`#show-${name}`).click();
+      assert.deepEqual(await houseBounds(), initial, `${name} keeps position and size`);
+    }
+    await setModule(panel, 'm02', false);
+    await panel.locator('#show-ports').click();
+    assert.equal(await panel.locator('#module-off').isVisible(), true);
+    assert.deepEqual(await houseBounds(), initial);
+    await setModule(panel, 'm01', false);
+    for (const name of ['food', 'convert']) {
+      await panel.locator(`#show-${name}`).click();
+      assert.equal(await panel.locator('#module-off').isVisible(), true);
+      assert.deepEqual(await houseBounds(), initial);
+    }
+    assert.equal(await panel.locator('#draft').inputValue(), '{"item":8}');
+    assert.equal(await panel.locator('#convert-draft').inputValue(), '{"item":8}');
+    assert.deepEqual(errors, []);
+  } finally { await app.close(); }
+});
+
+test('Panel: stable views stay within the display, preserve drafts, and keep navigation reachable', { timeout: 30000 }, async t => {
   const app = await launch(await profileFor(t));
   try {
     const { pet, panel } = await openPanel(app);
@@ -1997,17 +2116,18 @@ test('Panel: compact views resize within the display, preserve drafts, and keep 
 
     await mkdir(path.join(root, 'test-results'), { recursive: true });
     await panel.screenshot({ path: path.join(root, 'test-results/panel-food.png') });
-    await panel.locator('#draft').fill('{"project":"BytePet","enabled":true}');
+    await panel.locator('#show-convert').click();
+    await panel.locator('#convert-draft').fill('{"project":"BytePet","enabled":true}');
     await panel.locator('#run-tool').click();
     assert.ok((await panel.locator('.toolbar').boundingBox()).y >= 0);
     await panel.screenshot({ path: path.join(root, 'test-results/panel-result.png') });
     await panel.locator('#show-settings').click();
-    await expectHeight(530);
+    await expectHeight(588);
     assert.equal(await panel.locator('#character-picker button[aria-pressed="true"]').evaluate(el => el === document.activeElement), true);
     await panel.screenshot({ path: path.join(root, 'test-results/panel-settings.png') });
     await pet.evaluate(() => window.utilityPanel.setView('food'));
     await panel.evaluate(() => window.utilityPanel.setView('invalid'));
-    assert.equal((await panelBounds()).bounds.height, Math.min(530, (await panelBounds()).area.height - 10));
+    assert.equal((await panelBounds()).bounds.height, Math.min(588, (await panelBounds()).area.height - 10));
 
     await app.evaluate(({ ipcMain }) => {
       ipcMain.removeHandler('ports:list');
@@ -2028,21 +2148,22 @@ test('Panel: compact views resize within the display, preserve drafts, and keep 
     await panel.screenshot({ path: path.join(root, 'test-results/panel-ports.png') });
     await panel.evaluate(() => { const content = document.querySelector('.content'); content.scrollTo(0, content.scrollHeight); });
     assert.ok((await panel.locator('.toolbar').boundingBox()).y >= 0);
-    await panel.locator('#show-food').click();
-    assert.equal(await panel.locator('#draft').inputValue(), '{"project":"BytePet","enabled":true}');
+    await panel.locator('#show-convert').click();
+    assert.equal(await panel.locator('#convert-draft').inputValue(), '{"project":"BytePet","enabled":true}');
     assert.equal(await panel.locator('#json-result').isVisible(), true);
+    await panel.locator('#send-to-food').click();
     await panel.locator('#feed-text').click();
     await panel.waitForFunction(() => document.querySelectorAll('#food-list li').length === 1);
     await panel.screenshot({ path: path.join(root, 'test-results/panel-shelf.png') });
     await setModule(panel, 'm01', false);
     await panel.locator('#show-food').click();
-    await expectHeight(298);
+    await expectHeight(588);
     assert.equal(await panel.locator('#enable-module').isVisible(), true);
     await panel.locator('#close').click();
     await pet.evaluate(() => window.petPanel.toggle());
-    await expectHeight(298);
+    await expectHeight(588);
     await panel.locator('#enable-module').click();
-    await expectHeight(530);
+    await expectHeight(588);
   } finally { await app.close(); }
 });
 

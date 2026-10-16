@@ -13,6 +13,8 @@
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 html, body { background: transparent; }
+.icon-definitions { position: absolute; width: 0; height: 0; overflow: hidden; }
+section, .panel-views { min-width: 0; }
 body { margin: 0; padding: 10px; overflow: hidden; }
 main { position: relative; height: calc(100vh - 20px); padding-top: 88px; display: flex; flex-direction: column; filter: drop-shadow(0 3px 4px #202a3a24); }
 .house-roof { position: absolute; top: 0; left: 0; width: 100%; height: 90px; z-index: 3; pointer-events: none; }
@@ -41,7 +43,7 @@ button:disabled { cursor: default; opacity: .45; }
 #app-preferences-status:empty, #position-status:empty { display: none; }
 #app-preferences-status.error, #position-status.error { color: var(--error); }
 :focus-visible { outline: 3px solid #087aff66; outline-offset: 2px; }
-.panel-views button { flex: 1; min-height: 27px; padding: 4px 6px; border: 0; background: transparent; box-shadow: none; color: #5b5b64; }
+.panel-views button { flex: 1; min-width: 0; min-height: 27px; padding: 4px 6px; border: 0; background: transparent; box-shadow: none; color: #5b5b64; }
 .panel-views button[aria-pressed="true"] { color: #252529; background: #fff; box-shadow: 0 1px 3px #00000020; font-weight: 600; }
 #close { flex: 0 0 24px; min-height: 24px; padding: 0; border: 0; background: transparent; box-shadow: none; color: #777781; font-size: 21px; line-height: 24px; }
 .content { padding: 14px 12px; margin: 0 7px; background: #f7f2e9; border: 1px solid #bda78d; border-top: 0; border-bottom: 7px solid #b89b7d; border-radius: 0 0 9px 9px; box-shadow: inset 3px 0 #e0cdb5, inset -3px 0 #e0cdb5; flex: 1; min-height: 0; overflow-y: auto; scrollbar-gutter: stable; }
@@ -61,19 +63,51 @@ textarea:focus-visible { outline: none; }
 #feed-status, #settings-status, #port-action-status, .copy-status, .port-open-status { color: var(--success); font-size: 11px; line-height: 1.5; margin: 8px 0 0; overflow-wrap: anywhere; }
 #feed-status:empty, #settings-status:empty, #port-action-status:empty, .copy-status:empty, .port-open-status:empty, #format-hint:empty { display: none; }
 #feed-status.error, #settings-status.error, #port-action-status.error, .copy-status.error, .port-open-status.error, #port-status.error { color: var(--error); }
+/* A small feeding station above a file cabinet. */
+.station-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 9px; }
+.station-heading h2 { color: #5b6557; font-weight: 600; }
+.station-heading > span { color: #8b8c7c; font-size: 10px; }
+.food-bowl { border: 2px solid #8baea0; border-radius: 18px 18px 42px 42px; background: #fffdf7; overflow: hidden; box-shadow: 0 3px 0 #ded8c9; }
+.food-bowl:focus-within { border-color: #4c8979; box-shadow: 0 0 0 2px #4c897921, 0 3px 0 #ded8c9; }
+.food-bowl textarea { height: 76px; padding: 12px 13px 8px; font-size: 12px; line-height: 1.5; }
+.bowl-base { height: 29px; border-top: 4px solid #a9c5b7; background: #6f9886; display: flex; justify-content: center; align-items: center; }
+.bowl-base svg { width: 17px; height: 17px; fill: #eaf0df; }
+body.food-over .food-bowl { border-color: #477b5b; background: #e5f2de; box-shadow: 0 0 0 3px #87b66b55; }
 .shelf { margin-top: 20px; }
 .shelf-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
 .shelf-header button { min-height: 24px; padding: 3px 0 3px 6px; border: 0; background: transparent; box-shadow: none; font-size: 11px; color: var(--accent); }
-#food-list, #port-list { list-style: none; padding: 0; margin: 0; background: #fff; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
-#food-list:empty, #port-list:empty { display: none; }
-#food-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px; padding: 10px; border-bottom: 1px solid #ebebef; }
-#food-list li:last-child, #port-list li:last-child { border-bottom: 0; }
-.item-name { display: block; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.item-meta { color: var(--muted); font-size: 10px; margin: 4px 0 0; grid-column: 1; }
+#shelf-count { display: inline-block; margin-left: 4px; color: #98866f; font-size: 10px; font-weight: 400; }
+.shelf-cabinet { border: 1px solid #d7c8b3; border-top: 4px solid #c4a580; border-radius: 7px; background: #fffcf6; box-shadow: inset 0 -3px #f0e5d4; }
+#food-list { list-style: none; padding: 8px; margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+#food-list:empty { display: none; }
+#food-list li { min-width: 0; }
+.file-tile { display: flex; flex-direction: column; align-items: center; width: 100%; min-height: 112px; padding: 6px 3px; border: 1px solid transparent; background: transparent; box-shadow: none; border-radius: 6px; white-space: normal; }
+.file-tile:hover:not(:disabled) { background: #f1eadf; }
+.file-tile[aria-pressed="true"] { background: #e6eee6; border-color: #8aab95; }
+.file-tile svg { width: 46px; height: 46px; flex: none; color: #a08d6d; }
+.file-tile[data-kind="image"] svg { color: #648e79; }
+.file-tile[data-kind="code"] svg { color: #8995b5; }
+.file-tile[data-kind="archive"] svg { color: #b18b58; }
+.item-name { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; line-height: 1.4; font-size: 11px; margin: 3px 0 0; }
+.item-meta { color: #8a887f; font-size: 9px; margin-top: 4px; line-height: 1.4; }
+#empty-shelf { display: flex; flex-direction: column; align-items: center; gap: 7px; margin: 0; padding: 20px 6px; color: #847760; font-size: 12px; }
+#empty-shelf svg { width: 40px; height: 40px; opacity: .8; }
+#empty-shelf small { font-size: 10px; color: #a19480; }
+#shelf-selection { position: sticky; bottom: 0; z-index: 1; border: 1px solid #d7c8b3; box-shadow: 0 -3px 8px #66553b12; margin-top: 8px; padding: 9px; border-radius: 6px; background: #ede7dc; }
+#selected-food-name { margin: 0 0 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+.shelf-actions { display: flex; flex-wrap: wrap; gap: 5px; }
+.shelf-actions button { font-size: 10px; padding: 3px 7px; min-height: 25px; }
+.conversion-editor { border-top: 4px solid #a6aaa0; border-radius: 7px; }
+.conversion-editor textarea { height: 88px; font: 12px/1.65 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.conversion-caption { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 7px; }
+.conversion-caption #format-hint { flex: 1; margin: 0; }
+#send-to-food { flex: none; padding: 2px 0; border: 0; background: transparent; color: var(--accent); font-size: 10px; box-shadow: none; }
+#port-list { list-style: none; padding: 0; margin: 0; background: #fff; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+#port-list:empty { display: none; }
+#port-list li:last-child { border-bottom: 0; }
 .item-actions { display: flex; gap: 5px; align-items: center; }
-#food-list .item-actions { grid-column: 2; grid-row: 1 / 3; }
 .item-actions button { padding: 3px 7px; min-height: 24px; font-size: 11px; }
-#empty-shelf, #empty-ports { margin: 0; padding: 26px 10px; text-align: center; color: #8b8b94; font-size: 12px; }
+#empty-ports { margin: 0; padding: 26px 10px; text-align: center; color: #8b8b94; font-size: 12px; }
 body.food-over .content { box-shadow: inset 0 0 0 2px var(--accent); }
 body.food-over .roof-surface { stroke: var(--accent); }
 #jwt-result, #json-result { margin-top: 14px; padding: 11px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
@@ -126,9 +160,9 @@ body.food-over .roof-surface { stroke: var(--accent); }
 #appearance-status:empty { display: none; }
 #appearance-status.error { color: var(--error); }
 
-/* Four compact sections retain the native segmented-control rhythm. */
+/* Five compact tabs keep navigation reachable at the fixed house width. */
 .toolbar { gap: 5px; padding-inline: 7px; }
-.panel-views button { padding-inline: 4px; font-size: 11px; }
+.panel-views button { padding-inline: 3px; font-size: 11px; }
 .settings-group select { max-width: 150px; padding: 4px 5px; }
 .usage-provider { padding: 12px; margin-bottom: 10px; border: 1px solid #ded8ce; border-radius: 8px; background: #fffdf8; }
 .usage-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; margin-bottom: 12px; }
