@@ -1,5 +1,8 @@
 <h1 align="center">BytePet</h1>
 
+> [!IMPORTANT]
+> **현재 BytePet은 개발 중인 Preview 버전입니다.** 아직 정식 버전이 아니며, 기능과 UI가 변경되거나 예상치 못한 문제가 발생할 수 있습니다. 버그와 개선 의견은 [GitHub Issues](https://github.com/Sidepond/BytePet/issues)에 남겨 주세요.
+
 <p align="center">
   <strong>작업하는 동안 곁을 지키는, 작은 픽셀 친구.</strong><br>
   macOS를 위한 데스크톱 펫 · 로컬 보관함 · 개발 도구 · AI 사용량
