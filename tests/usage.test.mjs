@@ -47,6 +47,37 @@ test('usage: atomic preferences survive restart and invalid changes do not enter
   assert.equal(store.read().preferences.badgeMode, 'hidden', 'explicit hide is preserved');
 });
 
+test('usage: legacy top migrates to ground once while explicit placements and hide remain intact', t => {
+  const directory = temporary(t), file = path.join(directory, 'ai-usage.json'), store = createUsageStore(directory);
+  fs.writeFileSync(file, JSON.stringify({ version: 1, preferences: { ...DEFAULTS, badgePosition: 'top', badgeMode: 'hidden' } }));
+  assert.equal(store.read().preferences.badgePosition, 'ground');
+  assert.equal(store.read().preferences.badgeMode, 'hidden');
+  assert.equal(JSON.parse(fs.readFileSync(file)).version, 2);
+  store.write({ ...DEFAULTS, badgePosition: 'top' });
+  assert.equal(createUsageStore(directory).read().preferences.badgePosition, 'top', 'a new explicit top preference survives restart');
+  for (const position of ['left', 'right']) {
+    fs.writeFileSync(file, JSON.stringify({ version: 1, preferences: { ...DEFAULTS, badgePosition: position } }));
+    assert.equal(store.read().preferences.badgePosition, position);
+  }
+});
+
+test('usage: ground gauge stays on the yard, including one provider, hidden ground and all screen edges', () => {
+  for (const area of [{ x: 0, y: 0, width: 1440, height: 900 }, { x: -1200, y: -100, width: 1200, height: 800 }]) {
+    for (const ground of [true, false]) for (const menuSide of ['left', 'right']) for (const rows of [1, 2]) {
+      const width = ground ? 496 : 128;
+      for (const x of [area.x, area.x + area.width - width]) for (const y of [area.y, area.y + area.height - 128]) {
+        const pet = { x, y, width, height: 128 }, appearance = { ground, menuSide };
+        const result = badgeBounds(pet, area, appearance, 'ground', { y: 50, height: 60 }, rows);
+        assert.deepEqual(result, badgeBounds(pet, area, appearance, 'ground', { y: 0, height: 20 }, rows));
+        assert.equal(result.side, 'ground'); assert.equal(result.height, rows === 1 ? 16 : 24);
+        assert.ok(result.x >= pet.x + 8 && result.x + result.width <= pet.x + pet.width - 8);
+        assert.equal(result.y + result.height / 2, pet.y + pet.height - 12);
+        assert.ok(result.x >= area.x && result.y >= area.y && result.x + result.width <= area.x + area.width && result.y + result.height <= area.y + area.height);
+      }
+    }
+  }
+});
+
 function fakeServer({ account = { type: 'chatgpt', email: 'do-not-expose@example.test' }, fail = false, hang = false } = {}) {
   const requests = []; let killed = false;
   const child = new EventEmitter(); child.stdin = new PassThrough(); child.stdout = new PassThrough(); child.stderr = new PassThrough();

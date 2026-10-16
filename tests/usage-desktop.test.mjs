@@ -58,6 +58,7 @@ test('Usage UI: providers, Claude connection, settings, migrated always-visible 
     await new Promise(resolve => setTimeout(resolve, 650));
     assert.equal(await native(app, 'BytePet AI 사용량', 'isVisible'), true, 'legacy hover setting stays visible with cursor away');
     assert.equal(JSON.parse(await readFile(path.join(f.profile, 'ai-usage.json'), 'utf8')).preferences.badgeMode, 'always');
+    assert.equal(JSON.parse(await readFile(path.join(f.profile, 'ai-usage.json'), 'utf8')).preferences.badgePosition, 'ground');
     let panel = await openPanel(app, pet); observe(panel);
     assert.equal((await pet.evaluate(() => window.aiUsage.set('badgeMode', 'always'))).ok, false, 'pet cannot mutate settings');
     assert.equal((await pet.evaluate(() => window.aiUsage.connectClaude(true))).ok, false, 'pet cannot change Claude configuration');
@@ -148,7 +149,7 @@ test('Usage UI: providers, Claude connection, settings, migrated always-visible 
 
 test('Usage UI: first badge click opens the usage view after a cold panel load', { timeout: 20000 }, async t => {
   const f = await fixture(t);
-  await writeFile(path.join(f.profile, 'ai-usage.json'), JSON.stringify({ version: 1, preferences: { codex: true, claude: true, badgeMode: 'always', badgePosition: 'top', badgeWindow: 'primary' } }));
+  await writeFile(path.join(f.profile, 'ai-usage.json'), JSON.stringify({ version: 2, preferences: { codex: true, claude: true, badgeMode: 'always', badgePosition: 'top', badgeWindow: 'primary' } }));
   const options = process.env.BYTEPET_USAGE_TEST_APP
     ? { executablePath: process.env.BYTEPET_USAGE_TEST_APP, args: [`--user-data-dir=${f.profile}`], cwd: tmpdir(), env: f.env }
     : { args: [root, `--user-data-dir=${f.profile}`], cwd: root, env: f.env };
@@ -227,5 +228,49 @@ test('Usage UI: gauge anchor ignores animated alpha and follows only window move
     });
     await until(async () => (await native(app, 'BytePet AI 사용량', 'getBounds'))?.y === before.y - 20);
     assert.equal((await native(app, 'BytePet AI 사용량', 'getBounds')).x, before.x - 20);
+  } finally { await app.close(); }
+});
+
+
+test('Usage UI: ground overlay follows both yard directions and ground visibility, stays clickable and persists', { timeout: 30000 }, async t => {
+  const f = await fixture(t);
+  const options = { args: [root, `--user-data-dir=${f.profile}`], cwd: root, env: f.env };
+  let app = await electron.launch(options);
+  try {
+    const pet = await app.firstWindow(); await pet.waitForFunction(() => document.querySelector('#pet')?.dataset.character);
+    const panel = await openPanel(app, pet);
+    await until(() => native(app, 'BytePet AI 사용량', 'isVisible'));
+    const badge = app.windows().find(w => w.url().endsWith('/usage-badge.html'));
+    await badge.waitForFunction(() => document.body.dataset.position === 'ground');
+    await panel.locator('#show-settings').click();
+    assert.equal(await panel.locator('#usage-position').inputValue(), 'ground');
+    for (const side of ['right', 'left']) for (const ground of [false, true]) {
+      await panel.locator('#menu-side').selectOption(side);
+      await panel.waitForFunction(() => !document.querySelector('#menu-side').disabled);
+      await panel.locator('#show-ground').setChecked(ground);
+      await panel.waitForFunction(() => !document.querySelector('#show-ground').disabled);
+      await until(async () => {
+        const yard = await native(app, 'BytePet', 'getBounds'), gauge = await native(app, 'BytePet AI 사용량', 'getBounds');
+        return gauge.height === 24 && gauge.y + 12 === yard.y + yard.height - 12 && gauge.x >= yard.x + 8 && gauge.x + gauge.width <= yard.x + yard.width - 8;
+      });
+      assert.equal(await badge.locator('#usage-badge').evaluate(el => el.scrollHeight <= el.clientHeight), true, 'both rows fit the ground gauge');
+    }
+    await panel.locator('#usage-claude').uncheck();
+    await panel.waitForFunction(() => !document.querySelector('#usage-claude').disabled);
+    await until(async () => (await native(app, 'BytePet AI 사용량', 'getBounds')).height === 16);
+    await panel.locator('#close').click();
+    await badge.locator('#usage-badge').click();
+    await panel.locator('#usage-view').waitFor();
+    await panel.locator('#show-settings').click();
+    await panel.locator('#usage-position').selectOption('top');
+    await panel.waitForFunction(() => !document.querySelector('#usage-position').disabled);
+    await badge.waitForFunction(() => document.body.dataset.position === 'top');
+    await panel.locator('#usage-position').selectOption('ground');
+    await panel.waitForFunction(() => !document.querySelector('#usage-position').disabled);
+    await app.close(); app = await electron.launch(options);
+    await app.firstWindow(); await until(() => native(app, 'BytePet AI 사용량', 'isVisible'));
+    assert.equal((await native(app, 'BytePet AI 사용량', 'getBounds')).height, 16);
+    const saved = JSON.parse(await readFile(path.join(f.profile, 'ai-usage.json'), 'utf8'));
+    assert.equal(saved.version, 2); assert.equal(saved.preferences.badgePosition, 'ground');
   } finally { await app.close(); }
 });

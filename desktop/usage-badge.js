@@ -1,5 +1,6 @@
 import { watchUsage, usageState, usageDisplay } from './usage-ui.js';
 function render(state) {
+  document.body.dataset.position = state.preferences.badgePosition || 'ground';
   const rows = document.querySelector('#badge-rows');
   rows.replaceChildren();
   const period = state.preferences.badgeWindow || 'primary';

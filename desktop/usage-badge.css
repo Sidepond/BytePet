@@ -17,3 +17,20 @@ progress::-webkit-progress-value { background: #6e9585; border-radius: 2px; }
 [data-level="muted"] { color: #938b80; }
 [data-level="muted"] progress::-webkit-progress-value { background: #b8b1a6; }
 progress[data-known="false"]::-webkit-progress-bar { background: repeating-linear-gradient(90deg, #d8d1c5 0 3px, transparent 3px 5px); }
+
+/* A small inset gauge on the yard; its native window follows the ground, not the sprite. */
+body[data-position="ground"] { padding: 0; font-size: 10px; color: #ffffff; }
+body[data-position="ground"] button { height: 100vh; padding: 0 4px; border: 1px solid #75916b; border-radius: 4px; background: #263b24; box-shadow: inset 0 1px #9db68333; }
+body[data-position="ground"] button:hover { background: #334d2e; border-color: #b5ce9f; }
+body[data-position="ground"] button:focus-visible { outline-color: #f5e6b4; }
+body[data-position="ground"] #badge-rows { gap: 0; }
+body[data-position="ground"] .badge-row { grid-template-columns: 34px minmax(0, 1fr) 32px; gap: 3px; line-height: 11px; }
+body[data-position="ground"] .badge-name { font-weight: 600; }
+body[data-position="ground"] .badge-percent { font-size: 10px; font-weight: 600; white-space: nowrap; }
+body[data-position="ground"] progress { height: 4px; }
+body[data-position="ground"] progress::-webkit-progress-bar { background: #62715c; }
+body[data-position="ground"] progress::-webkit-progress-value { background: #d4f4a3; }
+body[data-position="ground"] [data-level="warning"] progress::-webkit-progress-value { background: #f0ce76; }
+body[data-position="ground"] [data-level="high"] progress::-webkit-progress-value { background: #ffa68a; }
+body[data-position="ground"] [data-level="muted"] { color: #c5cfb8; }
+body[data-position="ground"] progress[data-known="false"]::-webkit-progress-bar { background: repeating-linear-gradient(90deg, #9aae8a 0 3px, transparent 3px 5px); }

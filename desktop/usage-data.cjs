@@ -1,10 +1,10 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const DEFAULTS = Object.freeze({ codex: true, claude: true, badgeMode: 'always', badgePosition: 'top', badgeWindow: 'primary' });
+const DEFAULTS = Object.freeze({ codex: true, claude: true, badgeMode: 'always', badgePosition: 'ground', badgeWindow: 'primary' });
 const validators = {
   codex: value => typeof value === 'boolean', claude: value => typeof value === 'boolean',
   badgeMode: value => ['always', 'hidden'].includes(value),
-  badgePosition: value => ['top', 'left', 'right'].includes(value),
+  badgePosition: value => ['ground', 'top', 'left', 'right'].includes(value),
   badgeWindow: value => ['primary', 'secondary'].includes(value),
 };
 function validChange(key, value) { return typeof key === 'string' && Object.hasOwn(validators, key) && validators[key](value); }
@@ -26,23 +26,24 @@ function createUsageStore(directory) {
     read() {
       try {
         const saved = readJson(file);
-        if (saved?.version !== 1) throw new Error('Unknown version');
+        if (![1, 2].includes(saved?.version)) throw new Error('Unknown version');
         const preferences = { ...DEFAULTS };
         for (const key of Object.keys(DEFAULTS)) {
-          const value = key === 'badgeMode' && saved.preferences?.badgeMode === 'hover' ? 'always' : saved.preferences?.[key];
+          let value = key === 'badgeMode' && saved.preferences?.badgeMode === 'hover' ? 'always' : saved.preferences?.[key];
+          if (saved.version === 1 && key === 'badgePosition' && value === 'top') value = 'ground';
           if (!validChange(key, value)) throw new Error('Invalid preferences');
           preferences[key] = value;
         }
-        if (saved.preferences.badgeMode === 'hover') {
-          try { atomicWrite(file, { version: 1, preferences }); }
-          catch { return { preferences, warning: '항상 표시로 변경했지만 설정 파일에 저장하지 못했어요.' }; }
+        if (saved.version === 1 || saved.preferences.badgeMode === 'hover') {
+          try { atomicWrite(file, { version: 2, preferences }); }
+          catch { return { preferences, warning: '사용량 배치 설정을 적용했지만 설정 파일에 저장하지 못했어요.' }; }
         }
         return { preferences, warning: null };
       } catch (error) {
         return { preferences: { ...DEFAULTS }, warning: error.code === 'ENOENT' ? null : 'AI 사용량 설정을 읽지 못해 기본값을 적용했어요.' };
       }
     },
-    write: preferences => atomicWrite(file, { version: 1, preferences }),
+    write: preferences => atomicWrite(file, { version: 2, preferences }),
   };
 }
 function usageWindow(id, percent, seconds, minutes) {

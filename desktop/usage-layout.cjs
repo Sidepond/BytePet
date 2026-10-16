@@ -3,8 +3,19 @@ function characterBounds(pet, appearance) {
   const center = appearance.ground && appearance.menuSide === 'left' ? pet.width - 64 : 64;
   return { x: pet.x + Math.max(0, Math.min(pet.width - 112, center - 56)), y: pet.y + pet.height - 125, width: 112, height: 112 };
 }
-function badgeBounds(pet, area, appearance, position = 'top', visibleCharacter = null, rowCount = 2) {
+function badgeBounds(pet, area, appearance, position = 'ground', visibleCharacter = null, rowCount = 2) {
   const frame = characterBounds(pet, appearance);
+  if (position === 'ground') {
+    // Center on the ground strip (bottom: 4px, height: 16px), independent of sprite alpha.
+    const width = Math.max(1, Math.min(120, pet.width - 16, area.width));
+    const height = Math.min(rowCount === 1 ? 16 : 24, area.height);
+    const x = Math.max(pet.x + 8, Math.min(frame.x + (frame.width - width) / 2, pet.x + pet.width - 8 - width));
+    return {
+      x: Math.round(Math.max(area.x, Math.min(x, area.x + area.width - width))),
+      y: Math.round(Math.max(area.y, Math.min(pet.y + pet.height - 12 - height / 2, area.y + area.height - height))),
+      width, height, side: 'ground',
+    };
+  }
   const character = visibleCharacter ? { ...frame, y: pet.y + visibleCharacter.y, height: visibleCharacter.height } : frame;
   const width = Math.min(140, area.width), height = Math.min(rowCount === 1 ? 26 : 40, area.height), gap = 4;
   const candidates = {
