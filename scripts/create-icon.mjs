@@ -1,69 +1,62 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { crc32, deflateSync } from 'node:zlib';
-import { drawCat } from '../desktop/cat.js';
+import { _electron as electron } from 'playwright';
+import manifest from '../desktop/sprite-manifest.js';
 
 const exec = promisify(execFile);
+const root = fileURLToPath(new URL('../', import.meta.url));
 
-// Render the existing code-drawn pet, so the app icon follows the same artwork.
+// Use the approved Marmalade idle frame, with no separately drawn substitute.
 export async function createIcon(directory) {
-  const size = 1024;
-  const pixels = Buffer.alloc(size * size * 4);
-  function paint(x, y, color) {
-    const offset = (y * size + x) * 4;
-    const alpha = (color[3] ?? 255) / 255;
-    const previousAlpha = pixels[offset + 3] / 255;
-    const resultAlpha = alpha + previousAlpha * (1 - alpha);
-    for (let channel = 0; channel < 3; channel++) {
-      pixels[offset + channel] = Math.round((color[channel] * alpha + pixels[offset + channel] * previousAlpha * (1 - alpha)) / resultAlpha);
-    }
-    pixels[offset + 3] = Math.round(resultAlpha * 255);
-  }
-  // An inset rounded tile leaves macOS's standard transparent icon margins.
-  for (let y = 80; y < 944; y++) {
-    for (let x = 80; x < 944; x++) {
-      const dx = Math.max(260 - x, 0, x - 763);
-      const dy = Math.max(260 - y, 0, y - 763);
-      if (dx * dx + dy * dy <= 180 * 180) paint(x, y, [69, 155, 143]);
-    }
-  }
-  const context = {
-    fillStyle: '#000000',
-    clearRect() {},
-    fillRect(x, y, width, height) {
-      const color = this.fillStyle.slice(1).match(/../g).map(value => Number.parseInt(value, 16));
-      for (let row = 128 + y * 32; row < 128 + (y + height) * 32; row++) {
-        for (let col = 128 + x * 32; col < 128 + (x + width) * 32; col++) paint(col, row, color);
+  await mkdir(directory, { recursive: true });
+  const scratch = await mkdtemp(path.join(tmpdir(), 'bytepet-icon-'));
+  const source = path.join(directory, 'BytePet.png');
+  const sheet = await readFile(path.join(root, 'desktop', manifest['cat-cheese'].actions.idle.file));
+  const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE;
+  let app;
+  try {
+    await writeFile(path.join(scratch, 'main.cjs'), `const {app,BrowserWindow}=require('electron');
+app.setPath('userData',${JSON.stringify(path.join(scratch, 'profile'))});
+app.whenReady().then(()=>new BrowserWindow({show:false,webPreferences:{sandbox:true,contextIsolation:true}}).loadURL('about:blank'));`);
+    app = await electron.launch({ args: [path.join(scratch, 'main.cjs')], env });
+    const page = await app.firstWindow();
+    const png = await page.evaluate(async data => {
+      const image = new Image(); image.src = data; await image.decode();
+      if (image.width !== 384 || image.height !== 192) throw new Error('Unexpected Marmalade sprite dimensions');
+      const frame = document.createElement('canvas'); frame.width = frame.height = 96;
+      const frameContext = frame.getContext('2d');
+      frameContext.drawImage(image, 0, 0, 96, 96, 0, 0, 96, 96);
+      const pixels = frameContext.getImageData(0, 0, 96, 96).data;
+      let left = 96, top = 96, right = -1, bottom = -1;
+      for (let y = 0; y < 96; y++) for (let x = 0; x < 96; x++) {
+        if (!pixels[(y * 96 + x) * 4 + 3]) continue;
+        left = Math.min(left, x); top = Math.min(top, y);
+        right = Math.max(right, x); bottom = Math.max(bottom, y);
       }
-    },
-  };
-  drawCat(context, 0);
-
-  function chunk(type, data) {
-    const contents = Buffer.concat([Buffer.from(type), data]);
-    const length = Buffer.alloc(4);
-    length.writeUInt32BE(data.length);
-    const checksum = Buffer.alloc(4);
-    checksum.writeUInt32BE(crc32(contents));
-    return Buffer.concat([length, contents, checksum]);
+      if (right < left) throw new Error('Marmalade frame is empty');
+      const canvas = document.createElement('canvas'); canvas.width = canvas.height = 1024;
+      const ctx = canvas.getContext('2d');
+      // Keep the familiar teal macOS tile and transparent outer margins.
+      ctx.fillStyle = '#459b8f'; ctx.beginPath(); ctx.roundRect(80, 80, 864, 864, 180); ctx.fill();
+      const width = right - left + 1, height = bottom - top + 1;
+      const scale = Math.floor(720 / Math.max(width, height));
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(frame, left, top, width, height,
+        Math.round((1024 - width * scale) / 2), Math.round((1024 - height * scale) / 2), width * scale, height * scale);
+      return canvas.toDataURL('image/png').split(',')[1];
+    }, `data:image/png;base64,${sheet.toString('base64')}`);
+    await writeFile(source, Buffer.from(png, 'base64'));
+  } finally {
+    if (app) await app.close();
+    await rm(scratch, { recursive: true, force: true });
   }
-  const header = Buffer.alloc(13);
-  header.writeUInt32BE(size, 0);
-  header.writeUInt32BE(size, 4);
-  header[8] = 8;
-  header[9] = 6; // RGBA
-  const scanlines = Buffer.alloc(size * (size * 4 + 1));
-  for (let y = 0; y < size; y++) pixels.copy(scanlines, y * (size * 4 + 1) + 1, y * size * 4, (y + 1) * size * 4);
-  const png = Buffer.concat([
-    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
-    chunk('IHDR', header), chunk('IDAT', deflateSync(scanlines)), chunk('IEND', Buffer.alloc(0)),
-  ]);
+
   const iconset = path.join(directory, 'BytePet.iconset');
   await mkdir(iconset, { recursive: true });
-  const source = path.join(directory, 'BytePet.png');
-  await writeFile(source, png);
   for (const points of [16, 32, 128, 256, 512]) {
     for (const scale of [1, 2]) {
       const target = path.join(iconset, `icon_${points}x${points}${scale === 2 ? '@2x' : ''}.png`);
