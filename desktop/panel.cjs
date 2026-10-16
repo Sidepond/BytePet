@@ -6,8 +6,9 @@ const { createResultService } = require('./results.cjs');
 const { createPortService } = require('./ports.cjs');
 const { createAppearanceService } = require('./appearance.cjs');
 const { createModuleService, createModuleStore } = require('./modules.cjs');
+const { createAppPreferences, registerAppPreferences } = require('./app-preferences.cjs');
 
-function createUtilityPanel(pet, { appearanceStore, appearanceInitial, applyAppearance }) {
+function createUtilityPanel(pet, { appearanceStore, appearanceInitial, applyAppearance, resetPosition }) {
   let panel;
   let open = false;
   let ready = false;
@@ -20,6 +21,8 @@ function createUtilityPanel(pet, { appearanceStore, appearanceInitial, applyAppe
     ipcMain, store: appearanceStore, initial: appearanceInitial, getPet: () => pet, getPanel: () => panel, apply: applyAppearance,
   });
   const modules = createModuleService({ ipcMain, store: createModuleStore(app.getPath('userData')), getPet: () => pet, getPanel: () => panel });
+  const appPreferences = registerAppPreferences({ ipcMain, getPanel: () => panel,
+    service: createAppPreferences({ app, clipboard, resetPosition }) });
   const food = createFoodService(pet, () => panel);
   const results = createResultService({ ipcMain, clipboard, pet, getPanel: () => panel });
   const ports = createPortService({
@@ -128,14 +131,16 @@ function createUtilityPanel(pet, { appearanceStore, appearanceInitial, applyAppe
   ipcMain.on('panel:ready', rendererReady);
   pet.webContents.on('did-finish-load', publish);
 
+  function openView(next) {
+    if (suspended) return;
+    requestedView = next; view = next; open = true; publish();
+    if (!panel) create();
+    show();
+  }
   return {
     window: () => panel,
-    openUsage() {
-      if (suspended) return;
-      requestedView = 'usage'; view = 'usage'; open = true; publish();
-      if (!panel) create();
-      show();
-    },
+    openUsage: () => openView('usage'),
+    openSettings: () => openView('settings'),
     reposition,
     setSuspended(value) {
       if (suspended === value) return;
@@ -149,6 +154,7 @@ function createUtilityPanel(pet, { appearanceStore, appearanceInitial, applyAppe
     },
     dispose() {
       appearance.dispose();
+      appPreferences.dispose();
       modules.dispose();
       food.dispose();
       results.dispose();

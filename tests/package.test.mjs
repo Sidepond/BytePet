@@ -80,6 +80,11 @@ test('Package: standalone app preserves development data and restores the existi
     await pet.evaluate(() => window.petPanel.toggle());
     panel = await opened;
     await panel.waitForLoadState('load');
+    const appPreferences = await panel.evaluate(() => window.appPreferences.get());
+    assert.equal(appPreferences.ok, true);
+    assert.equal(appPreferences.value.info.packaged, true);
+    assert.equal(appPreferences.value.info.version, JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8')).version);
+    assert.equal(appPreferences.value.login.available, false, 'isolated package tests never alter system login items');
     await panel.getByText('개발 앱에서 저장한 먹이', { exact: true }).waitFor();
     await panel.locator('#draft').fill('중복 실행 후에도 유지할 초안');
     // Relaunch raises a real native window. Keep unrelated keyboard/IME input

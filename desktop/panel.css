@@ -35,6 +35,11 @@ button { min-height: 27px; padding: 4px 10px; box-shadow: 0 1px 1px #00000006; c
 button:hover:not(:disabled) { background: #f0f0f3; }
 button:active:not(:disabled) { background: #e4e4e9; }
 button:disabled { cursor: default; opacity: .45; }
+.module-option > span:first-child { min-width: 0; }
+.module-option > button, .module-option > .module-toggle { flex-shrink: 0; }
+#app-preferences-status, #position-status { color: var(--success); }
+#app-preferences-status:empty, #position-status:empty { display: none; }
+#app-preferences-status.error, #position-status.error { color: var(--error); }
 :focus-visible { outline: 3px solid #087aff66; outline-offset: 2px; }
 .panel-views button { flex: 1; min-height: 27px; padding: 4px 6px; border: 0; background: transparent; box-shadow: none; color: #5b5b64; }
 .panel-views button[aria-pressed="true"] { color: #252529; background: #fff; box-shadow: 0 1px 3px #00000020; font-weight: 600; }

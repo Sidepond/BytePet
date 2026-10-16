@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, screen, ipcMain } = require('electron');
+const { app, BrowserWindow, Menu, screen, ipcMain, dialog } = require('electron');
 const path = require('node:path');
 const { getVisibleBounds, isPosition } = require('./window.cjs');
 const { createPositionStore } = require('./position-store.cjs');
@@ -19,6 +19,17 @@ if (!primaryInstance) app.quit();
 let petWindow;
 let petVisibility;
 let statusTray;
+let petActions;
+
+function openSettings() {
+  revealPet();
+  petActions?.openSettings();
+}
+
+function resetPetPosition() {
+  const result = petActions?.resetPosition();
+  if (result?.warning) void dialog.showMessageBox({ type: 'warning', title: 'BytePet', message: result.message });
+}
 
 function toggleVisibility() {
   if (petVisibility) petVisibility.setHidden(!petVisibility.isHidden());
@@ -64,6 +75,7 @@ function createPetWindow() {
   let usage;
   const panel = createUtilityPanel(win, {
     appearanceStore, appearanceInitial,
+    resetPosition,
     applyAppearance(next) {
       if (preferences.ground === next.ground && preferences.menuSide === next.menuSide) {
         preferences = next;
@@ -96,8 +108,21 @@ function createPetWindow() {
   let saveTimer;
   function savePosition() {
     clearTimeout(saveTimer);
-    if (!win.isDestroyed()) store.write(visibleBounds(win.getBounds()));
+    return !win.isDestroyed() && store.write(visibleBounds(win.getBounds()));
   }
+  function resetPosition() {
+    drag = null;
+    input.hold('drag', false);
+    win.webContents.send('pet:position-reset');
+    win.setBounds(visibleBounds(null));
+    panel.reposition();
+    if (hidden) setHidden(false);
+    else if (ready) win.showInactive();
+    usage?.reposition();
+    const saved = savePosition();
+    return { warning: !saved, message: saved ? '기본 화면 오른쪽 아래로 옮겼어요.' : '위치는 옮겼지만 저장하지 못했어요. 다음 실행 때는 이전 위치로 돌아갈 수 있어요.' };
+  }
+  petActions = { openSettings: () => panel.openSettings(), resetPosition };
   function keepVisible() {
     if (win.isDestroyed()) return;
     const current = win.getBounds();
@@ -177,6 +202,7 @@ function createPetWindow() {
     for (const event of displayEvents) screen.removeListener(event, keepVisible);
     petWindow = null;
     petVisibility = null;
+    petActions = null;
   });
 
   // The renderer has only narrow pet input bridges and never opens external content.
@@ -186,7 +212,13 @@ function createPetWindow() {
   win.webContents.on('context-menu', (_event, params) => {
     if (!input.hits(params)) return;
     input.hold('menu', true);
-    Menu.buildFromTemplate([{ label: 'BytePet 종료', role: 'quit' }]).popup({
+    Menu.buildFromTemplate([
+      { label: '설정…', click: openSettings },
+      { label: '기본 위치로 되돌리기', click: resetPetPosition },
+      { label: '잠시 숨기기', click: toggleVisibility },
+      { type: 'separator' },
+      { label: 'BytePet 종료', role: 'quit' },
+    ]).popup({
       window: win,
       callback: () => input.hold('menu', false),
     });
@@ -212,14 +244,16 @@ if (primaryInstance) {
   app.whenReady().then(() => {
     Menu.setApplicationMenu(Menu.buildFromTemplate([
       { label: 'BytePet', submenu: [
+        { id: 'open-settings', label: '설정…', accelerator: 'CommandOrControl+,', click: openSettings },
         { id: 'toggle-pet-visibility', label: '잠시 숨기기', click: toggleVisibility },
+        { id: 'reset-pet-position', label: '기본 위치로 되돌리기', click: resetPetPosition },
         { type: 'separator' },
         { label: 'BytePet 종료', role: 'quit', accelerator: 'CommandOrControl+Q' },
       ] },
       { label: '편집', submenu: [{ role: 'undo' }, { role: 'redo' }, { type: 'separator' }, { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }] },
     ]));
     createPetWindow();
-    statusTray = createStatusTray(toggleVisibility);
+    statusTray = createStatusTray(toggleVisibility, { openSettings, resetPosition: resetPetPosition });
   });
 }
 

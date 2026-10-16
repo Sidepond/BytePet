@@ -56,7 +56,12 @@
             <span><strong>땅 표시</strong><small>집과 캐릭터 아래에 마당을 표시합니다</small></span>
             <span class="module-toggle"><input id="show-ground" type="checkbox" role="switch" checked></span>
           </label>
+          <div class="module-option">
+            <span><strong>캐릭터 위치</strong><small>기본 화면 오른쪽 아래로 이동합니다</small></span>
+            <button id="reset-position" type="button">되돌리기</button>
+          </div>
         </div>
+        <p id="position-status" class="settings-hint" role="status" aria-live="polite"></p>
         <h2 class="section-label feature-label">AI 사용량 배지</h2>
         <div class="settings-group">
           <label class="module-option" for="usage-mode"><strong>표시 방식</strong><select id="usage-mode"><option value="always">항상 표시</option><option value="hidden">숨기기</option></select></label>
@@ -78,6 +83,18 @@
         </label>
         </div>
         <p id="settings-status" role="status" aria-live="polite"></p>
+        <h2 class="section-label feature-label">앱</h2>
+        <p id="app-preferences-status" class="settings-hint" role="status" aria-live="polite"></p>
+        <div class="settings-group">
+          <label class="module-option" for="open-at-login">
+            <span><strong>로그인 시 자동 실행</strong><small id="login-hint"></small></span>
+            <span class="module-toggle"><input id="open-at-login" type="checkbox" role="switch" disabled></span>
+          </label>
+          <div class="module-option">
+            <span><strong id="app-version">BytePet</strong><small>업데이트 확인은 아직 지원하지 않습니다</small></span>
+            <button id="copy-app-info" type="button">환경 정보 복사</button>
+          </div>
+        </div>
       </section>
       <section id="food-view" aria-label="먹이와 변환">
       <div class="editor">

@@ -37,12 +37,14 @@ function createTrayIcon() {
   return icon;
 }
 
-function createStatusTray(toggleVisibility) {
+function createStatusTray(toggleVisibility, { openSettings, resetPosition }) {
   const tray = new Tray(createTrayIcon());
   function refresh(hidden) {
     tray.setToolTip(hidden ? 'BytePet · 숨김' : 'BytePet');
     tray.setContextMenu(Menu.buildFromTemplate([
+      { id: 'open-settings', label: '설정…', click: openSettings },
       { id: 'toggle-pet-visibility', label: hidden ? '다시 표시' : '잠시 숨기기', click: toggleVisibility },
+      { id: 'reset-pet-position', label: '기본 위치로 되돌리기', click: resetPosition },
       { type: 'separator' },
       { label: 'BytePet 종료', role: 'quit' },
     ]));

@@ -1,5 +1,12 @@
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
+contextBridge.exposeInMainWorld('appPreferences', {
+  get: () => ipcRenderer.invoke('app-preferences:get'),
+  setLogin: enabled => ipcRenderer.invoke('app-preferences:login', enabled),
+  resetPosition: () => ipcRenderer.invoke('app-preferences:reset-position'),
+  copyInfo: () => ipcRenderer.invoke('app-preferences:copy-info'),
+});
+
 // Keep the last native state even if the renderer is still loading preferences.
 let petVisible = true;
 const visibilityListeners = new Set();
@@ -37,6 +44,11 @@ contextBridge.exposeInMainWorld('appearance', {
 
 // Narrow bridges only; the renderer has no unrestricted file or clipboard access.
 contextBridge.exposeInMainWorld('petDrag', {
+  onReset: callback => {
+    const listener = () => callback();
+    ipcRenderer.on('pet:position-reset', listener);
+    return () => ipcRenderer.removeListener('pet:position-reset', listener);
+  },
   start: (x, y) => ipcRenderer.send('pet:drag', 'start', { x, y }),
   move: (x, y) => ipcRenderer.send('pet:drag', 'move', { x, y }),
   end: () => ipcRenderer.send('pet:drag', 'end'),

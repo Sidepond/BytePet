@@ -7,6 +7,7 @@ import { setupJsonPanel } from './json-panel.js';
 import { setupFormatPanel } from './format-panel.js';
 import { setupPortsPanel } from './ports-panel.js';
 import { setupUsagePanel } from './usage-panel.js';
+import { setupAppPreferences } from './app-preferences-panel.js';
 
 await Promise.all([modulesReady, appearanceReady, charactersReady]);
 const draft = document.querySelector('#draft');
@@ -20,6 +21,7 @@ const list = document.querySelector('#food-list');
 const files = document.querySelector('#files');
 const ports = setupPortsPanel();
 const usage = setupUsagePanel();
+const appPreferences = setupAppPreferences();
 let view = 'food';
 function renderView() {
   const off = (view === 'food' && !moduleEnabled('m01')) || (view === 'ports' && !moduleEnabled('m02'));
@@ -45,6 +47,7 @@ function showView(next) {
   if (next === 'usage') usage.refresh();
   else if (next === 'ports') ports.refresh();
   else if (next === 'food') refresh();
+  else if (next === 'settings') appPreferences.refresh();
   focusView();
 }
 for (const name of ['food', 'ports', 'usage', 'settings']) document.querySelector(`#show-${name}`).addEventListener('click', () => showView(name));
@@ -167,11 +170,12 @@ document.addEventListener('keydown', event => {
   }
 });
 window.utilityPanel.onOpen(requested => {
-  if (requested === 'usage') { showView('usage'); return; }
+  if (requested === 'usage' || requested === 'settings') { showView(requested); return; }
   focusView();
   if (view === 'usage') usage.refresh();
   else if (view === 'ports') ports.refresh();
   else if (view === 'food') refresh();
+  else if (view === 'settings') appPreferences.refresh();
 });
 window.food.onSaved(({ count }) => {
   if (!moduleEnabled('m01')) return;

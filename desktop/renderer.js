@@ -16,7 +16,7 @@ const petDragging = enableDragging(canvas, window.petDrag, event => isCanvasHit(
     : reason === 'release' && !reducedMotion.matches && nativeVisible ? { state: 'landing', startedAt: performance.now() } : null;
   updateAnimation();
 });
-enableDragging(document.querySelector('#yard-ground'), window.petDrag);
+const groundDragging = enableDragging(document.querySelector('#yard-ground'), window.petDrag);
 let panelOpen = false;
 window.petPanel.onState(open => {
   panelOpen = open;
@@ -149,7 +149,13 @@ onAppearanceChanged(applyAppearance);
 applyAppearance();
 window.petVisibility.onChanged(visible => {
   nativeVisible = visible;
-  if (!visible) { petDragging.cancel(); dragVisual = null; }
+  if (!visible) { petDragging.cancel(); groundDragging.cancel(); dragVisual = null; }
   canvas.dataset.visible = String(visible);
+  updateAnimation();
+});
+window.petDrag.onReset(() => {
+  petDragging.cancel();
+  groundDragging.cancel();
+  dragVisual = null;
   updateAnimation();
 });
