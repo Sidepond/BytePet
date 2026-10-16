@@ -1,0 +1,28 @@
+{
+  "idle": {
+    "offset": {
+      "x": 8,
+      "y": 13
+    },
+    "bounds": {
+      "left": 8,
+      "top": 13,
+      "right": 39,
+      "bottom": 44,
+      "visible": 695
+    }
+  },
+  "sleeping": {
+    "offset": {
+      "x": 0,
+      "y": 3
+    },
+    "bounds": {
+      "left": 8,
+      "top": 16,
+      "right": 39,
+      "bottom": 44,
+      "visible": 653
+    }
+  }
+}

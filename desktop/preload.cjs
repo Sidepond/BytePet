@@ -1,5 +1,20 @@
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
+// Keep the last native state even if the renderer is still loading preferences.
+let petVisible = true;
+const visibilityListeners = new Set();
+ipcRenderer.on('pet:visibility', (_event, visible) => {
+  petVisible = visible;
+  for (const callback of visibilityListeners) callback(visible);
+});
+contextBridge.exposeInMainWorld('petVisibility', {
+  onChanged: callback => {
+    visibilityListeners.add(callback);
+    callback(petVisible);
+    return () => visibilityListeners.delete(callback);
+  },
+});
+
 contextBridge.exposeInMainWorld('modules', {
   get: () => ipcRenderer.invoke('modules:get'),
   set: (key, enabled) => ipcRenderer.invoke('modules:set', { key, enabled }),

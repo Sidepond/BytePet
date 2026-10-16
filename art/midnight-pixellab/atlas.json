@@ -1,0 +1,281 @@
+{
+  "version": 1,
+  "character": "midnight",
+  "catalogId": "cat-black",
+  "name": "루나",
+  "kind": "까망 고양이",
+  "provider": "PixelLab",
+  "presentation": "new-design",
+  "logicalFrame": {
+    "width": 48,
+    "height": 48
+  },
+  "frame": {
+    "width": 96,
+    "height": 96
+  },
+  "sourceScale": 2,
+  "columns": 4,
+  "rows": 2,
+  "frames": 8,
+  "pivot": {
+    "x": 48,
+    "y": 90
+  },
+  "actions": {
+    "idle": {
+      "file": "idle.png",
+      "durationMs": [
+        700,
+        180,
+        180,
+        180,
+        180,
+        180,
+        220,
+        400
+      ],
+      "frames": [
+        {
+          "sourceIndex": 0,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 8,
+            "top": 15,
+            "right": 39,
+            "bottom": 44,
+            "visible": 595
+          }
+        },
+        {
+          "sourceIndex": 1,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 6,
+            "top": 15,
+            "right": 39,
+            "bottom": 44,
+            "visible": 594
+          }
+        },
+        {
+          "sourceIndex": 2,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 7,
+            "top": 14,
+            "right": 39,
+            "bottom": 44,
+            "visible": 614
+          }
+        },
+        {
+          "sourceIndex": 3,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 7,
+            "top": 14,
+            "right": 38,
+            "bottom": 44,
+            "visible": 605
+          }
+        },
+        {
+          "sourceIndex": 4,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 8,
+            "top": 15,
+            "right": 38,
+            "bottom": 44,
+            "visible": 600
+          }
+        },
+        {
+          "sourceIndex": 5,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 6,
+            "top": 15,
+            "right": 38,
+            "bottom": 44,
+            "visible": 594
+          }
+        },
+        {
+          "sourceIndex": 6,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 7,
+            "top": 14,
+            "right": 39,
+            "bottom": 44,
+            "visible": 609
+          }
+        },
+        {
+          "sourceIndex": 7,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 7,
+            "top": 15,
+            "right": 39,
+            "bottom": 44,
+            "visible": 596
+          }
+        }
+      ],
+      "distinct": 8,
+      "closingPoseMatches": false,
+      "closingChangedPixels": 32,
+      "stepDifferences": [
+        2.1500651041666665,
+        6.017252604166667,
+        2.9805772569444446,
+        3.5680338541666665,
+        2.827907986111111,
+        2.9554036458333335,
+        7.992947048611111,
+        3.332248263888889
+      ],
+      "omittedSourceIndices": [
+        8
+      ]
+    },
+    "sleeping": {
+      "file": "sleeping.png",
+      "durationMs": [
+        450,
+        450,
+        450,
+        450,
+        450,
+        450,
+        450,
+        450
+      ],
+      "frames": [
+        {
+          "sourceIndex": 0,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 6,
+            "top": 23,
+            "right": 41,
+            "bottom": 44,
+            "visible": 531
+          }
+        },
+        {
+          "sourceIndex": 1,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 6,
+            "top": 22,
+            "right": 41,
+            "bottom": 44,
+            "visible": 541
+          }
+        },
+        {
+          "sourceIndex": 2,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 6,
+            "top": 22,
+            "right": 41,
+            "bottom": 44,
+            "visible": 552
+          }
+        },
+        {
+          "sourceIndex": 3,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 6,
+            "top": 21,
+            "right": 41,
+            "bottom": 44,
+            "visible": 567
+          }
+        },
+        {
+          "sourceIndex": 4,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 5,
+            "top": 21,
+            "right": 41,
+            "bottom": 44,
+            "visible": 561
+          }
+        },
+        {
+          "sourceIndex": 5,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 6,
+            "top": 22,
+            "right": 41,
+            "bottom": 44,
+            "visible": 544
+          }
+        },
+        {
+          "sourceIndex": 6,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 6,
+            "top": 23,
+            "right": 41,
+            "bottom": 44,
+            "visible": 549
+          }
+        },
+        {
+          "sourceIndex": 7,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 6,
+            "top": 23,
+            "right": 41,
+            "bottom": 44,
+            "visible": 527
+          }
+        }
+      ],
+      "distinct": 8,
+      "closingPoseMatches": false,
+      "closingChangedPixels": 14,
+      "stepDifferences": [
+        4.384874131944445,
+        2.727756076388889,
+        5.422092013888889,
+        6.196723090277778,
+        5.107638888888889,
+        5.429036458333333,
+        5.854926215277778,
+        1.1493055555555556
+      ],
+      "omittedSourceIndices": [
+        8
+      ]
+    }
+  }
+}

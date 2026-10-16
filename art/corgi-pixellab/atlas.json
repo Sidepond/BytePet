@@ -1,0 +1,289 @@
+{
+  "version": 1,
+  "character": "corgi",
+  "catalogId": "dog-corgi",
+  "name": "비스킷",
+  "kind": "코기",
+  "provider": "PixelLab",
+  "presentation": "new-design",
+  "logicalFrame": {
+    "width": 48,
+    "height": 48
+  },
+  "frame": {
+    "width": 96,
+    "height": 96
+  },
+  "sourceScale": 2,
+  "columns": 4,
+  "rows": 2,
+  "frames": 8,
+  "pivot": {
+    "x": 48,
+    "y": 90
+  },
+  "actions": {
+    "idle": {
+      "file": "idle.png",
+      "durationMs": [
+        700,
+        180,
+        180,
+        180,
+        180,
+        180,
+        220,
+        400
+      ],
+      "frames": [
+        {
+          "sourceIndex": 0,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 8,
+            "top": 13,
+            "right": 39,
+            "bottom": 44,
+            "visible": 695
+          }
+        },
+        {
+          "sourceIndex": 1,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 8,
+            "top": 13,
+            "right": 39,
+            "bottom": 44,
+            "visible": 695
+          }
+        },
+        {
+          "sourceIndex": 2,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 7,
+            "top": 14,
+            "right": 39,
+            "bottom": 44,
+            "visible": 674
+          }
+        },
+        {
+          "sourceIndex": 3,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 6,
+            "top": 14,
+            "right": 39,
+            "bottom": 44,
+            "visible": 675
+          }
+        },
+        {
+          "sourceIndex": 4,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 6,
+            "top": 14,
+            "right": 39,
+            "bottom": 44,
+            "visible": 669
+          }
+        },
+        {
+          "sourceIndex": 5,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 6,
+            "top": 14,
+            "right": 39,
+            "bottom": 44,
+            "visible": 669
+          }
+        },
+        {
+          "sourceIndex": 6,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 6,
+            "top": 13,
+            "right": 39,
+            "bottom": 44,
+            "visible": 685
+          }
+        },
+        {
+          "sourceIndex": 7,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 7,
+            "top": 13,
+            "right": 39,
+            "bottom": 44,
+            "visible": 696
+          }
+        }
+      ],
+      "distinct": 8,
+      "closingPoseMatches": false,
+      "closingChangedPixels": 68,
+      "stepDifferences": [
+        0.032769097222222224,
+        10.308702256944445,
+        4.808485243055555,
+        1.6692708333333333,
+        0.1982421875,
+        8.866319444444445,
+        2.976779513888889,
+        4.606662326388889
+      ],
+      "omittedSourceIndices": [
+        8
+      ]
+    },
+    "sleeping": {
+      "file": "sleeping.png",
+      "durationMs": [
+        450,
+        450,
+        450,
+        450,
+        450,
+        450,
+        450,
+        450
+      ],
+      "frames": [
+        {
+          "sourceIndex": 0,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 8,
+            "top": 16,
+            "right": 39,
+            "bottom": 44,
+            "visible": 652
+          },
+          "removedFloatingPixels": 0
+        },
+        {
+          "sourceIndex": 1,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 7,
+            "top": 15,
+            "right": 39,
+            "bottom": 44,
+            "visible": 674
+          },
+          "removedFloatingPixels": 11
+        },
+        {
+          "sourceIndex": 2,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 6,
+            "top": 14,
+            "right": 39,
+            "bottom": 44,
+            "visible": 688
+          },
+          "removedFloatingPixels": 36
+        },
+        {
+          "sourceIndex": 3,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 6,
+            "top": 15,
+            "right": 38,
+            "bottom": 44,
+            "visible": 683
+          },
+          "removedFloatingPixels": 52
+        },
+        {
+          "sourceIndex": 4,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 6,
+            "top": 16,
+            "right": 38,
+            "bottom": 44,
+            "visible": 678
+          },
+          "removedFloatingPixels": 47
+        },
+        {
+          "sourceIndex": 5,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 6,
+            "top": 15,
+            "right": 38,
+            "bottom": 44,
+            "visible": 673
+          },
+          "removedFloatingPixels": 24
+        },
+        {
+          "sourceIndex": 6,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 6,
+            "top": 15,
+            "right": 38,
+            "bottom": 44,
+            "visible": 676
+          },
+          "removedFloatingPixels": 0
+        },
+        {
+          "sourceIndex": 7,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 7,
+            "top": 15,
+            "right": 39,
+            "bottom": 44,
+            "visible": 670
+          },
+          "removedFloatingPixels": 0
+        }
+      ],
+      "distinct": 8,
+      "closingPoseMatches": false,
+      "closingChangedPixels": 25,
+      "stepDifferences": [
+        7.285590277777778,
+        8.503797743055555,
+        9.949652777777779,
+        2.5475260416666665,
+        2.3770616319444446,
+        8.66623263888889,
+        9.255425347222221,
+        7.933376736111111
+      ],
+      "omittedSourceIndices": [
+        8
+      ]
+    }
+  }
+}

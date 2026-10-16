@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ko">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BytePet · 치즈 고양이 스프라이트 비교</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#293c35;background:#f2f3ef;color-scheme:light}*{box-sizing:border-box}body{margin:0;padding:32px 24px}main{max-width:1000px;margin:auto}h1{font-size:24px;letter-spacing:-.7px;margin:0 0 10px}p{font-size:14px;line-height:1.6;color:#647269;margin:0}header{margin-bottom:24px}.toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:18px}.group{display:flex;gap:4px}button,select{font:inherit;font-size:13px;min-height:36px;border:1px solid #cdd5cd;background:#fff;color:inherit;border-radius:7px;padding:8px 12px;cursor:pointer}button[aria-pressed=true]{background:#366a59;color:#fff;border-color:#366a59}button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid #d59d4e;outline-offset:3px}label{font-size:13px;display:flex;gap:6px;align-items:center}.comparison{display:grid;grid-template-columns:1fr 1fr;gap:16px}.card{background:#fff;border:1px solid #d9ded6;border-radius:14px;overflow:hidden}.card-head{display:flex;justify-content:space-between;gap:12px;padding:18px 20px 0;font-size:14px}.tag{font-size:12px;color:#758278}.stage{height:330px;display:flex;align-items:center;justify-content:center;position:relative;--zoom:1}.stage canvas{image-rendering:pixelated;width:calc(96px * var(--zoom));height:calc(96px * var(--zoom));position:relative;z-index:1}.guides .stage canvas{outline:1px dashed #a4b9ac}.guides .stage:after{content:"";position:absolute;width:calc(96px * var(--zoom));top:calc(50% + var(--floor-offset, 44px) * var(--zoom));border-top:1px solid #d68055;z-index:2;pointer-events:none}.note{padding:0 20px 18px;font-size:12px}.controls{display:flex;gap:8px;align-items:center;margin:20px 0 14px}#frame{margin-left:auto;font-variant-numeric:tabular-nums;color:#647269;font-size:13px}.film{display:grid;grid-template-columns:repeat(8,1fr);gap:8px}.film button{padding:6px 0;min-width:0;background:#fff;border-color:#d9ded6;color:#647269}.film button[aria-pressed=true]{background:#edf5ed;border:2px solid #366a59;color:#366a59}.film canvas{display:block;width:72px;height:72px;max-width:100%;margin:auto;image-rendering:pixelated}.film span{display:block;font-size:11px;padding-top:4px}.spec{margin-top:24px;padding-top:18px;border-top:1px solid #d5dcd2;display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap}.spec p{font-size:12px}#error{color:#a43737;margin-top:20px}@media(max-width:600px){body{padding:22px 14px}h1{font-size:21px}.comparison{grid-template-columns:1fr}.stage{height:310px}.film{grid-template-columns:repeat(4,1fr)}.card-head{padding:14px 16px 0}.toolbar{gap:8px}.tag{font-size:11px}}
+</style>
+<main>
+<header><h1>치즈 고양이 · 스프라이트 비교</h1><p>같은 96×96 화면에서 기존 픽셀 그림과 새 이미지 애니메이션을 비교해 보세요.</p></header>
+<div class="toolbar">
+  <div class="group" aria-label="동작"><button id="idle" aria-pressed="true">대기</button><button id="sleeping" aria-pressed="false">잠자기</button></div>
+  <label>크기 <select id="zoom"><option value="1">실제 크기 · 1배</option><option value="3">자세히 · 3배</option></select></label>
+  <label><input id="guides" type="checkbox">프레임·바닥선</label>
+</div>
+<section class="comparison" aria-label="캐릭터 비교">
+  <article class="card"><div class="card-head"><strong>기존 방식</strong><span class="tag">코드로 그린 픽셀</span></div><div class="stage"><canvas id="original" width="24" height="24" role="img" aria-label="기존 치즈 고양이 애니메이션"></canvas></div><p class="note">24×24 그림을 96×96으로 표시</p></article>
+  <article class="card"><div class="card-head"><strong>이미지 방식</strong><span class="tag">PNG · 8프레임</span></div><div class="stage"><canvas id="sprite" width="96" height="96" role="img" aria-label="이미지 치즈 고양이 애니메이션"></canvas></div><p class="note" id="sprite-note">96×96 프레임 · 모든 프레임에 동일한 확대 비율</p></article>
+</section>
+<div class="controls"><button id="play">일시 정지</button><button id="next">다음 프레임</button><span id="frame" aria-label="현재 프레임">1 / 8</span></div>
+<div class="film" aria-label="프레임 선택"></div>
+<div class="spec"><p>고정 규격: 96×96px · 4열×2행 · 투명 PNG · 바닥선 92px</p><p>첫 시안: 대기와 잠자기만 비교합니다.</p></div>
+<p id="error" role="alert" hidden></p>
+</main>
+<script type="module">
+/* GENERATED_DATA */
+const images = {};
+window.images = images;
+let action = 'idle', frame = 0, elapsed = 0, last = performance.now(), playing = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = selector => document.querySelector(selector);
+if (atlas.logicalFrame?.width === 24) {
+  document.body.dataset.pixelStyle = '24';
+  $('h1').textContent = '치즈 고양이 · 도트 스프라이트 비교';
+  $('#sprite-note').textContent = '24×24 도트 · 기존 색상 · PNG를 4배 확대';
+  $('.spec p:last-child').textContent = '수정 시안: 굵은 도트 · 잠자기 얼굴 위치 고정';
+}
+if (atlas.provider === 'PixelLab' && atlas.presentation !== 'new-design') {
+  $('h1').textContent = '치즈 고양이 · PixelLab 비교';
+  $('.card:last-child strong').textContent = 'PixelLab 이미지';
+  $('#sprite-note').textContent = '기존 24×24 그림을 입력 · 생성한 PNG를 정확히 4배 확대';
+  $('.spec p:last-child').textContent = 'PixelLab 시안 · 잠자기는 얼굴과 발을 고정하고 등에 생성 모션 적용';
+}
+if (atlas.presentation === 'new-design') {
+  document.title = `BytePet · ${atlas.name ?? '마멀레이드'}`;
+  $('h1').textContent = `${atlas.name ?? '마멀레이드'} · ${atlas.kind ?? '치즈 고양이'}`;
+  $('header p').textContent = 'PixelLab으로 새로 디자인한 캐릭터의 대기와 잠자기 모션을 살펴보세요.';
+  $('.card:first-child strong').textContent = '기준 자세';
+  $('.card:first-child .tag').textContent = '새로 생성한 디자인';
+  $('.card:first-child .note').textContent = '코드 그림을 참조하지 않고 텍스트로 만든 캐릭터';
+  $('.card:last-child strong').textContent = '움직이는 모습';
+  $('#sprite-note').textContent = '생성된 전체 동작을 재생 · 얼굴과 몸을 자연스럽게 움직임';
+  $('#original').width = $('#original').height = 96;
+  $('#original').setAttribute('aria-label', '새 캐릭터 기준 자세');
+  $('#sprite').setAttribute('aria-label', '새 캐릭터 애니메이션');
+  $('.spec p:first-child').textContent = '96×96px · 4열×2행 · 투명 PNG · 모든 동작에 동일한 2배 확대';
+  $('.spec p:last-child').textContent = '프레임별 크기 변경 없음 · 바닥선 90px';
+  document.documentElement.style.setProperty('--floor-offset', '42px');
+}
+const oldContext = $('#original').getContext('2d'), newContext = $('#sprite').getContext('2d');
+function setPlaying(value) { playing = value; last = performance.now(); $('#play').textContent = playing ? '일시 정지' : '재생'; }
+function paint() {
+  const image = images[action];
+  if (!image) return;
+  newContext.clearRect(0, 0, 96, 96);
+  newContext.imageSmoothingEnabled = false;
+  newContext.drawImage(image, frame % 4 * 96, Math.floor(frame / 4) * 96, 96, 96, 0, 0, 96, 96);
+  if (atlas.presentation === 'new-design') {
+    oldContext.clearRect(0, 0, 96, 96); oldContext.imageSmoothingEnabled = false;
+    oldContext.drawImage(image, 0, 0, 96, 96, 0, 0, 96, 96);
+  } else if (action === 'idle') drawCat(oldContext, elapsed);
+  else drawSleeping(oldContext, elapsed, { species: 'cat', palette });
+  $('#frame').textContent = `${frame + 1} / 8`;
+  [...document.querySelectorAll('.film button')].forEach((button, i) => button.setAttribute('aria-pressed', String(i === frame)));
+}
+function selectFrame(index) {
+  setPlaying(false); frame = index;
+  elapsed = atlas.actions[action].durationMs.slice(0, index).reduce((a, b) => a + b, 0);
+  paint();
+}
+function selectAction(next) {
+  action = next; frame = 0; elapsed = 0; last = performance.now();
+  for (const name of ['idle', 'sleeping']) $(`#${name}`).setAttribute('aria-pressed', String(name === action));
+  for (const [i, thumbnail] of [...document.querySelectorAll('.film canvas')].entries()) {
+    const ctx = thumbnail.getContext('2d'); ctx.clearRect(0, 0, 96, 96);
+    ctx.drawImage(images[action], i % 4 * 96, Math.floor(i / 4) * 96, 96, 96, 0, 0, 96, 96);
+  }
+  paint();
+}
+try {
+  await Promise.all(Object.entries(sheets).map(async ([action, source]) => {
+    const image = new Image(); image.src = source; await image.decode(); images[action] = image;
+  }));
+  for (let i = 0; i < 8; i++) {
+    const button = document.createElement('button'); button.setAttribute('aria-label', `${i + 1}번 프레임`);
+    const thumb = document.createElement('canvas'); thumb.width = thumb.height = 96; thumb.setAttribute('aria-hidden', 'true');
+    const label = document.createElement('span'); label.textContent = i + 1;
+    button.append(thumb, label); button.addEventListener('click', () => selectFrame(i)); $('.film').append(button);
+  }
+  for (const name of ['idle', 'sleeping']) $(`#${name}`).addEventListener('click', () => selectAction(name));
+  $('#play').addEventListener('click', () => setPlaying(!playing));
+  $('#next').addEventListener('click', () => selectFrame((frame + 1) % 8));
+  $('#zoom').addEventListener('change', event => document.querySelectorAll('.stage').forEach(el => el.style.setProperty('--zoom', event.target.value)));
+  $('#guides').addEventListener('change', event => document.body.classList.toggle('guides', event.target.checked));
+  matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', event => { if (event.matches) setPlaying(false); });
+  document.addEventListener('visibilitychange', () => { last = performance.now(); });
+  setPlaying(playing); selectAction('idle'); document.body.dataset.ready = 'true';
+  function tick(now) {
+    if (playing && !document.hidden) {
+      const duration = atlas.actions[action].durationMs;
+      elapsed = (elapsed + now - last) % duration.reduce((a, b) => a + b, 0);
+      let remainder = elapsed; frame = 0;
+      while (frame < 7 && remainder >= duration[frame]) remainder -= duration[frame++];
+      paint();
+    }
+    last = now; requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+} catch (error) { $('#error').hidden = false; $('#error').textContent = `미리보기를 불러오지 못했어요: ${error.message}`; }
+</script>
+</html>

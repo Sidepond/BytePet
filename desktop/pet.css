@@ -6,7 +6,9 @@ body { user-select: none; }
 #yard-ground::before { content: ""; position: absolute; inset: 0 7px auto; height: 4px; background: repeating-linear-gradient(90deg, transparent 0 13px, #b0c98b 13px 16px, transparent 16px 25px); }
 #yard-ground::after { content: ""; position: absolute; left: 14px; right: 14px; top: 8px; height: 2px; background: repeating-linear-gradient(90deg, transparent 0 31px, #d3af7a 31px 34px, transparent 34px 61px); }
 #yard-ground.dragging { cursor: grabbing; }
-canvas { position: absolute; left: calc(100% - 112px); bottom: 16px; display: block; width: 96px; height: 96px; image-rendering: pixelated; cursor: grab; touch-action: none; }
+/* The sprite's floor is at 45/48: 112px leaves 7px below its feet.
+   Place that floor on the grass, 20px above the window bottom. */
+canvas { position: absolute; left: calc(100% - 120px); bottom: 13px; display: block; width: 112px; height: 112px; image-rendering: pixelated; cursor: grab; touch-action: none; }
 canvas.dragging { cursor: grabbing; }
 canvas:focus-visible { outline: 2px dashed #459b8f; outline-offset: -2px; }
 #pet-message { position: absolute; top: 0; left: 0; width: 128px; max-height: 42px; overflow: hidden; background: #fffaf0; border: 1px solid #d8c6ac; border-radius: 5px; padding: 3px; color: #53382f; font: 10px/1.3 sans-serif; text-align: center; pointer-events: none; }

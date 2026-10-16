@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ko">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BytePet · 작은 친구들</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#313c36;background:#f3f4ef;color-scheme:light}*{box-sizing:border-box}body{margin:0;padding:32px 22px}main{max-width:1020px;margin:auto}h1{font-size:27px;letter-spacing:-.8px;margin:0 0 8px}header p{margin:0;color:#6b786d;font-size:14px;line-height:1.6}.toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:24px 0 20px}.group{display:flex;gap:4px}button,select,a{font:inherit}button,select{font-size:13px;min-height:36px;padding:8px 13px;border:1px solid #cdd6ca;border-radius:8px;background:#fff;color:inherit;cursor:pointer}button[aria-pressed=true]{background:#3c6b57;color:white;border-color:#3c6b57}button:focus-visible,a:focus-visible,select:focus-visible{outline:3px solid #d99e44;outline-offset:3px}label{display:flex;gap:8px;align-items:center;font-size:13px}.spacer{flex:1}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.card{background:white;border:1px solid #dbe0d5;border-radius:16px;overflow:hidden}.card-head{padding:19px 20px 0;display:flex;align-items:baseline;justify-content:space-between;gap:10px}h2{font-size:17px;margin:0}.kind{font-size:12px;color:#788475}.stage{height:242px;display:flex;align-items:center;justify-content:center;--zoom:2}.stage canvas{width:calc(96px * var(--zoom));height:calc(96px * var(--zoom));image-rendering:pixelated}.card-foot{padding:0 20px 17px;display:flex;justify-content:space-between;align-items:center;color:#788475;font-size:12px}.card-foot a{color:#3b6955;text-underline-offset:3px}.frame{font-variant-numeric:tabular-nums}footer{display:flex;gap:12px;justify-content:space-between;flex-wrap:wrap;border-top:1px solid #dbe0d5;margin-top:25px;padding-top:16px;font-size:12px;color:#788475}#error{color:#a33232}@media(max-width:760px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.kind{font-size:11px}.card-head{padding:16px 14px 0}.card-foot{padding:0 14px 16px}}@media(max-width:500px){body{padding:24px 14px}.grid{grid-template-columns:1fr}.spacer{display:none}.toolbar{gap:8px}.stage{height:226px}}
+</style>
+<main>
+<header><h1>작은 친구들</h1><p>고양이 셋, 강아지 셋. 같은 도트 세계에서 각자의 표정으로 쉬고 있어요.</p></header>
+<div class="toolbar">
+  <div class="group" aria-label="동작"><button id="idle" aria-pressed="true">대기</button><button id="sleeping" aria-pressed="false">잠자기</button></div>
+  <label>크기 <select id="zoom"><option value="1">실제 크기 · 1배</option><option value="2" selected>자세히 · 2배</option></select></label>
+  <div class="spacer"></div><button id="play">일시 정지</button><button id="next">다음 프레임</button>
+</div>
+<section class="grid" aria-label="캐릭터 모음"></section>
+<footer><span>PixelLab 캐릭터 시안 · 96×96px · 대기와 잠자기 각 8프레임</span><span>실제 앱에 적용하기 전 미리보기</span></footer>
+<p id="error" role="alert" hidden></p>
+</main>
+<script type="module">
+/* GENERATED_PACK */
+const $ = selector => document.querySelector(selector);
+let action = 'idle', elapsed = 0, last = performance.now(), playing = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+const pets = [];
+function setPlaying(value){playing=value;last=performance.now();$('#play').textContent=playing?'일시 정지':'재생';}
+function paint(forceFrame){
+  for(const pet of pets){
+    const durations=pet.atlas.actions[action].durationMs;
+    let remaining=elapsed%durations.reduce((a,b)=>a+b,0),frame=0;
+    while(frame<7&&remaining>=durations[frame])remaining-=durations[frame++];
+    if(forceFrame!==undefined)frame=forceFrame;
+    pet.frame=frame;
+    pet.ctx.clearRect(0,0,96,96);pet.ctx.imageSmoothingEnabled=false;
+    pet.ctx.drawImage(pet.images[action],frame%4*96,Math.floor(frame/4)*96,96,96,0,0,96,96);
+    pet.counter.textContent=`${frame+1} / 8`;
+  }
+}
+function selectAction(next){action=next;elapsed=0;last=performance.now();for(const name of ['idle','sleeping'])$(`#${name}`).setAttribute('aria-pressed',String(name===action));paint();}
+try{
+  for(const entry of pack){
+    const images={};
+    for(const [name,src]of Object.entries(entry.sheets)){const image=new Image();image.src=src;await image.decode();images[name]=image;}
+    const card=document.createElement('article');card.className='card';card.dataset.character=entry.id;
+    const head=document.createElement('div');head.className='card-head';
+    const title=document.createElement('h2');title.textContent=entry.name;
+    const kind=document.createElement('span');kind.className='kind';kind.textContent=entry.kind;head.append(title,kind);
+    const stage=document.createElement('div');stage.className='stage';
+    const canvas=document.createElement('canvas');canvas.width=canvas.height=96;canvas.setAttribute('role','img');canvas.setAttribute('aria-label',`${entry.name} 애니메이션`);stage.append(canvas);
+    const foot=document.createElement('div');foot.className='card-foot';
+    const counter=document.createElement('span');counter.className='frame';counter.setAttribute('aria-label',`${entry.name} 현재 프레임`);
+    const link=document.createElement('a');link.textContent='프레임 자세히 보기';link.href=`../${entry.id}-pixellab/preview.html`;foot.append(counter,link);
+    card.append(head,stage,foot);$('.grid').append(card);
+    pets.push({...entry,images,ctx:canvas.getContext('2d'),counter,frame:0});
+  }
+  for(const name of ['idle','sleeping'])$(`#${name}`).addEventListener('click',()=>selectAction(name));
+  $('#play').addEventListener('click',()=>setPlaying(!playing));
+  $('#next').addEventListener('click',()=>{setPlaying(false);const index=(pets[0].frame+1)%8;elapsed=pets[0].atlas.actions[action].durationMs.slice(0,index).reduce((a,b)=>a+b,0);paint(index);});
+  $('#zoom').addEventListener('change',event=>document.querySelectorAll('.stage').forEach(stage=>stage.style.setProperty('--zoom',event.target.value)));
+  matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change',event=>{if(event.matches)setPlaying(false);});
+  document.addEventListener('visibilitychange',()=>{last=performance.now();});
+  setPlaying(playing);paint();document.body.dataset.ready='true';
+  function tick(now){if(playing&&!document.hidden){elapsed+=now-last;paint();}last=now;requestAnimationFrame(tick);}requestAnimationFrame(tick);
+}catch(error){$('#error').hidden=false;$('#error').textContent=`미리보기를 불러오지 못했어요: ${error.message}`;}
+</script>
+</html>

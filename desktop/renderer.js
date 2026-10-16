@@ -1,16 +1,22 @@
 import { moduleEnabled, moduleState, modulesReady, onModulesChanged } from './module-state.js';
-import { characterFor, drawCharacter } from './characters.js';
+import { characterFor, drawCharacter, charactersReady } from './characters.js';
 import { appearanceReady, appearanceState, onAppearanceChanged } from './appearance-state.js';
 import { createReactionPlayer } from './reaction.js';
 import { enableDragging } from './drag.js';
 import { isCanvasHit, createHitRegionReporter } from './hit-test.js';
 import { enableFoodDrop, resultMessage } from './feeding.js';
+import { createIdleBehavior } from './idle-behavior.js';
 
-await Promise.all([modulesReady, appearanceReady]);
+await Promise.all([modulesReady, appearanceReady, charactersReady]);
 const canvas = document.querySelector('#pet');
 enableDragging(canvas, window.petDrag, event => isCanvasHit(canvas, event), () => window.petPanel.toggle());
 enableDragging(document.querySelector('#yard-ground'), window.petDrag);
-window.petPanel.onState(open => canvas.setAttribute('aria-expanded', String(open)));
+let panelOpen = false;
+window.petPanel.onState(open => {
+  panelOpen = open;
+  canvas.setAttribute('aria-expanded', String(open));
+  updateAnimation();
+});
 canvas.addEventListener('keydown', event => {
   if ((event.key === 'Enter' || event.key === ' ') && !event.repeat) {
     event.preventDefault();
@@ -20,7 +26,9 @@ canvas.addEventListener('keydown', event => {
 const reportHitRegion = createHitRegionReporter(canvas, window.petInput);
 const ctx = canvas.getContext('2d');
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-const startedAt = performance.now();
+// Only schedule poses present in the approved image pack.
+const idleBehavior = createIdleBehavior({ actions: ['sleeping'] });
+let nativeVisible = true;
 let timer;
 let reaction = { state: 'idle', startedAt: 0 };
 let messageTimer;
@@ -84,18 +92,32 @@ onModulesChanged(({ modules }) => {
 });
 
 function render() {
-  let elapsed = performance.now() - (reaction.state === 'idle' ? startedAt : reaction.startedAt);
+  const now = performance.now();
+  let state = reaction.state;
+  let elapsed = now - reaction.startedAt;
+  if (state === 'idle') {
+    const resting = nativeVisible && !panelOpen && !document.hidden && !reducedMotion.matches && !document.querySelector('.dragging');
+    const pose = resting ? idleBehavior.sample(now) : { state: 'idle', elapsed: now };
+    state = pose.state;
+    elapsed = pose.elapsed;
+  }
   if (reducedMotion.matches) elapsed = reaction.state === 'eating' ? 1500 : reaction.state === 'attack' ? 150 : reaction.state === 'processing' ? 300 : 0;
-  drawCharacter(ctx, appearanceState().preferences.character, reaction.state, elapsed);
+  canvas.dataset.idle = reaction.state === 'idle' ? state : '';
+  drawCharacter(ctx, appearanceState().preferences.character, state, elapsed);
   reportHitRegion();
 }
 
 function updateAnimation() {
   clearInterval(timer);
+  idleBehavior.reset(performance.now());
   render();
   // A stationary pixel pet only needs 10fps for its idle and reaction frames.
-  if (!document.hidden && !reducedMotion.matches) timer = setInterval(render, 100);
+  if (nativeVisible && !document.hidden && !reducedMotion.matches) timer = setInterval(render, 100);
 }
+
+// Let the original silhouette complete click hit testing before waking the pet.
+document.addEventListener('pointerup', updateAnimation);
+document.addEventListener('pointercancel', updateAnimation);
 
 reducedMotion.addEventListener('change', updateAnimation);
 document.addEventListener('visibilitychange', updateAnimation);
@@ -106,11 +128,18 @@ function applyAppearance() {
   canvas.dataset.character = selected.id;
   canvas.setAttribute('aria-label', `${selected.name} 유틸리티 패널`);
   document.querySelector('#yard-ground').hidden = !ground;
-  const x = ground && menuSide === 'left' ? Math.max(0, innerWidth - 112) : Math.min(16, Math.max(0, innerWidth - 96));
+  const size = canvas.getBoundingClientRect().width;
+  const center = ground && menuSide === 'left' ? innerWidth - 64 : 64;
+  const x = Math.max(0, Math.min(innerWidth - size, center - size / 2));
   canvas.style.left = `${x}px`;
-  message.style.left = `${Math.max(0, Math.min(innerWidth - 128, x - 16))}px`;
+  message.style.left = `${Math.max(0, Math.min(innerWidth - 128, x + size / 2 - 64))}px`;
   updateAnimation();
 }
 window.addEventListener('resize', applyAppearance);
 onAppearanceChanged(applyAppearance);
 applyAppearance();
+window.petVisibility.onChanged(visible => {
+  nativeVisible = visible;
+  canvas.dataset.visible = String(visible);
+  updateAnimation();
+});

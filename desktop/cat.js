@@ -45,8 +45,8 @@ export function getIdlePose(elapsed) {
   };
 }
 
-export function drawCat(ctx, elapsed, colors = palette) {
-  const pose = getIdlePose(elapsed);
+export function drawCat(ctx, elapsed, colors = palette, overrides = {}) {
+  const pose = { ...getIdlePose(elapsed), ...overrides };
   ctx.clearRect(0, 0, SIZE, SIZE);
   ctx.imageSmoothingEnabled = false;
 
@@ -95,6 +95,31 @@ export function drawCat(ctx, elapsed, colors = palette) {
   ctx.fillRect(8, 14, 9, 1);
   ctx.fillStyle = '#ffe293';
   ctx.fillRect(12, 15, 2, 2);
+}
+
+export function drawRestingCat(ctx, state, elapsed, colors = palette) {
+  if (state === 'sleeping') {
+    drawCat(ctx, 0, colors, { blink: true, lift: elapsed < 300 ? 1 : 2 });
+    return;
+  }
+  const stretching = state === 'stretching';
+  const active = elapsed >= 400 && elapsed < (stretching ? 2700 : 4200);
+  drawCat(ctx, 0, colors, { blink: active, lift: stretching && active ? -1 : 0 });
+  if (!active) return;
+  if (stretching) {
+    const raised = elapsed >= 800 && elapsed <= 2300;
+    const arm = ['.oo.', 'occo', 'offo', ...Array(raised ? 8 : 3).fill('.ofo'), '.oo.'];
+    paintRows(ctx, arm, 2, raised ? 5 : 11, colors);
+    paintRows(ctx, arm, 19, raised ? 5 : 11, colors);
+    ctx.fillStyle = colors.o;
+    ctx.fillRect(12, 11, 2, 2);
+  } else {
+    // Lift a paw to the cheek, then rub in short strokes.
+    const y = 10 + Math.floor(elapsed / 300) % 2;
+    paintRows(ctx, ['.oo.', 'occo', 'offo', 'offo', 'offo', '.oo.'], 7, y, colors);
+    ctx.fillStyle = colors.p;
+    if (Math.floor(elapsed / 600) % 2) ctx.fillRect(11, 12, 1, 2);
+  }
 }
 
 export function drawEatingCat(ctx, elapsed, colors = palette) {

@@ -1,0 +1,281 @@
+{
+  "version": 1,
+  "character": "tuxedo",
+  "catalogId": "cat-tuxedo",
+  "name": "오레오",
+  "kind": "턱시도 고양이",
+  "provider": "PixelLab",
+  "presentation": "new-design",
+  "logicalFrame": {
+    "width": 48,
+    "height": 48
+  },
+  "frame": {
+    "width": 96,
+    "height": 96
+  },
+  "sourceScale": 2,
+  "columns": 4,
+  "rows": 2,
+  "frames": 8,
+  "pivot": {
+    "x": 48,
+    "y": 90
+  },
+  "actions": {
+    "idle": {
+      "file": "idle.png",
+      "durationMs": [
+        700,
+        180,
+        180,
+        180,
+        180,
+        180,
+        220,
+        400
+      ],
+      "frames": [
+        {
+          "sourceIndex": 0,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 9,
+            "top": 14,
+            "right": 38,
+            "bottom": 44,
+            "visible": 667
+          }
+        },
+        {
+          "sourceIndex": 1,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 9,
+            "top": 13,
+            "right": 38,
+            "bottom": 44,
+            "visible": 682
+          }
+        },
+        {
+          "sourceIndex": 2,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 9,
+            "top": 14,
+            "right": 39,
+            "bottom": 44,
+            "visible": 666
+          }
+        },
+        {
+          "sourceIndex": 3,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 8,
+            "top": 15,
+            "right": 40,
+            "bottom": 44,
+            "visible": 648
+          }
+        },
+        {
+          "sourceIndex": 4,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 8,
+            "top": 16,
+            "right": 39,
+            "bottom": 44,
+            "visible": 640
+          }
+        },
+        {
+          "sourceIndex": 5,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 8,
+            "top": 16,
+            "right": 40,
+            "bottom": 44,
+            "visible": 630
+          }
+        },
+        {
+          "sourceIndex": 7,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 8,
+            "top": 15,
+            "right": 38,
+            "bottom": 44,
+            "visible": 656
+          }
+        },
+        {
+          "sourceIndex": 8,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 9,
+            "top": 14,
+            "right": 38,
+            "bottom": 44,
+            "visible": 667
+          }
+        }
+      ],
+      "distinct": 8,
+      "closingPoseMatches": false,
+      "closingChangedPixels": 7,
+      "stepDifferences": [
+        6.920789930555555,
+        8.863823784722221,
+        8.881293402777779,
+        8.520616319444445,
+        3.8177083333333335,
+        7.138454861111111,
+        9.141710069444445,
+        0.019205729166666668
+      ],
+      "omittedSourceIndices": [
+        6
+      ]
+    },
+    "sleeping": {
+      "file": "sleeping.png",
+      "durationMs": [
+        450,
+        450,
+        450,
+        450,
+        450,
+        450,
+        450,
+        450
+      ],
+      "frames": [
+        {
+          "sourceIndex": 0,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 7,
+            "top": 24,
+            "right": 41,
+            "bottom": 44,
+            "visible": 516
+          }
+        },
+        {
+          "sourceIndex": 1,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 6,
+            "top": 23,
+            "right": 41,
+            "bottom": 44,
+            "visible": 540
+          }
+        },
+        {
+          "sourceIndex": 2,
+          "offsetX": 0,
+          "offsetY": 1,
+          "bounds": {
+            "left": 6,
+            "top": 23,
+            "right": 41,
+            "bottom": 44,
+            "visible": 542
+          }
+        },
+        {
+          "sourceIndex": 3,
+          "offsetX": 0,
+          "offsetY": 1,
+          "bounds": {
+            "left": 6,
+            "top": 22,
+            "right": 41,
+            "bottom": 44,
+            "visible": 544
+          }
+        },
+        {
+          "sourceIndex": 4,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 6,
+            "top": 21,
+            "right": 41,
+            "bottom": 44,
+            "visible": 567
+          }
+        },
+        {
+          "sourceIndex": 5,
+          "offsetX": 0,
+          "offsetY": 1,
+          "bounds": {
+            "left": 6,
+            "top": 23,
+            "right": 41,
+            "bottom": 44,
+            "visible": 544
+          }
+        },
+        {
+          "sourceIndex": 6,
+          "offsetX": 0,
+          "offsetY": 1,
+          "bounds": {
+            "left": 6,
+            "top": 24,
+            "right": 41,
+            "bottom": 44,
+            "visible": 526
+          }
+        },
+        {
+          "sourceIndex": 7,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 6,
+            "top": 24,
+            "right": 41,
+            "bottom": 44,
+            "visible": 522
+          }
+        }
+      ],
+      "distinct": 8,
+      "closingPoseMatches": false,
+      "closingChangedPixels": 73,
+      "stepDifferences": [
+        3.995876736111111,
+        4.90625,
+        5.225368923611111,
+        10.2880859375,
+        11.02907986111111,
+        7.604275173611111,
+        5.112196180555555,
+        0.8419053819444444
+      ],
+      "omittedSourceIndices": [
+        8
+      ]
+    }
+  }
+}

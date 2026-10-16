@@ -1,0 +1,187 @@
+{
+  "newCharacters": 5,
+  "completedRequests": 20,
+  "reportedGenerations": 20,
+  "jobs": [
+    {
+      "character": "tuxedo",
+      "stage": "design",
+      "endpoint": "/create-image-pixen",
+      "usage": {
+        "type": "generations",
+        "generations": 1
+      }
+    },
+    {
+      "character": "tuxedo",
+      "stage": "sleep-pose-wide",
+      "endpoint": "/edit-image-pixen",
+      "usage": {
+        "type": "generations",
+        "generations": 1
+      }
+    },
+    {
+      "character": "tuxedo",
+      "stage": "idle",
+      "endpoint": "/animate-with-text-v3",
+      "usage": {
+        "type": "generations",
+        "generations": 1
+      }
+    },
+    {
+      "character": "tuxedo",
+      "stage": "sleeping",
+      "endpoint": "/animate-with-text-v3",
+      "usage": {
+        "type": "generations",
+        "generations": 1
+      }
+    },
+    {
+      "character": "midnight",
+      "stage": "design",
+      "endpoint": "/create-image-pixen",
+      "usage": {
+        "type": "generations",
+        "generations": 1
+      }
+    },
+    {
+      "character": "midnight",
+      "stage": "sleep-pose-wide",
+      "endpoint": "/edit-image-pixen",
+      "usage": {
+        "type": "generations",
+        "generations": 1
+      }
+    },
+    {
+      "character": "midnight",
+      "stage": "idle",
+      "endpoint": "/animate-with-text-v3",
+      "usage": {
+        "type": "generations",
+        "generations": 1
+      }
+    },
+    {
+      "character": "midnight",
+      "stage": "sleeping",
+      "endpoint": "/animate-with-text-v3",
+      "usage": {
+        "type": "generations",
+        "generations": 1
+      }
+    },
+    {
+      "character": "shiba",
+      "stage": "design",
+      "endpoint": "/create-image-pixen",
+      "usage": {
+        "type": "generations",
+        "generations": 1
+      }
+    },
+    {
+      "character": "shiba",
+      "stage": "sleep-pose-wide",
+      "endpoint": "/edit-image-pixen",
+      "usage": {
+        "type": "generations",
+        "generations": 1
+      }
+    },
+    {
+      "character": "shiba",
+      "stage": "idle",
+      "endpoint": "/animate-with-text-v3",
+      "usage": {
+        "type": "generations",
+        "generations": 1
+      }
+    },
+    {
+      "character": "shiba",
+      "stage": "sleeping",
+      "endpoint": "/animate-with-text-v3",
+      "usage": {
+        "type": "generations",
+        "generations": 1
+      }
+    },
+    {
+      "character": "retriever",
+      "stage": "design",
+      "endpoint": "/create-image-pixen",
+      "usage": {
+        "type": "generations",
+        "generations": 1
+      }
+    },
+    {
+      "character": "retriever",
+      "stage": "sleep-pose-wide",
+      "endpoint": "/edit-image-pixen",
+      "usage": {
+        "type": "generations",
+        "generations": 1
+      }
+    },
+    {
+      "character": "retriever",
+      "stage": "idle",
+      "endpoint": "/animate-with-text-v3",
+      "usage": {
+        "type": "generations",
+        "generations": 1
+      }
+    },
+    {
+      "character": "retriever",
+      "stage": "sleeping",
+      "endpoint": "/animate-with-text-v3",
+      "usage": {
+        "type": "generations",
+        "generations": 1
+      }
+    },
+    {
+      "character": "corgi",
+      "stage": "design",
+      "endpoint": "/create-image-pixen",
+      "usage": {
+        "type": "generations",
+        "generations": 1
+      }
+    },
+    {
+      "character": "corgi",
+      "stage": "sleep-pose-wide",
+      "endpoint": "/edit-image-pixen",
+      "usage": {
+        "type": "generations",
+        "generations": 1
+      }
+    },
+    {
+      "character": "corgi",
+      "stage": "idle",
+      "endpoint": "/animate-with-text-v3",
+      "usage": {
+        "type": "generations",
+        "generations": 1
+      }
+    },
+    {
+      "character": "corgi",
+      "stage": "sleeping",
+      "endpoint": "/animate-with-text-v3",
+      "usage": {
+        "type": "generations",
+        "generations": 1
+      }
+    }
+  ]
+}

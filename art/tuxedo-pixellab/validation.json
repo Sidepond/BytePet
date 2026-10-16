@@ -1,0 +1,31 @@
+{
+  "actions": {
+    "idle": {
+      "distinct": 8,
+      "closingPoseMatches": false,
+      "closingChangedPixels": 7,
+      "loopSeamDifference": 0.019205729166666668,
+      "maxInternalDifference": 9.141710069444445
+    },
+    "sleeping": {
+      "distinct": 8,
+      "closingPoseMatches": false,
+      "closingChangedPixels": 73,
+      "loopSeamDifference": 0.8419053819444444,
+      "maxInternalDifference": 11.02907986111111
+    }
+  },
+  "checks": [
+    "canvas dimensions",
+    "transparent margins",
+    "no clipped pixels",
+    "fixed floor",
+    "loop seam vs internal transitions",
+    "2× pixels",
+    "playback",
+    "pause",
+    "frame selection",
+    "reduced motion",
+    "mobile layout"
+  ]
+}

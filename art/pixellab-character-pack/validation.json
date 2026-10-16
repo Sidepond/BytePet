@@ -1,0 +1,17 @@
+{
+  "characters": 6,
+  "actions": 12,
+  "displayedFrames": 96,
+  "checks": [
+    "six distinct characters",
+    "matching frame size and floor",
+    "all playback advances",
+    "all pause",
+    "action and frame selection",
+    "96px actual size",
+    "detail links exist",
+    "reduced motion on change and initial load",
+    "mobile overflow",
+    "no page errors"
+  ]
+}

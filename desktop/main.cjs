@@ -114,6 +114,7 @@ function createPetWindow() {
       if (ready) win.showInactive();
       panel.setSuspended(false);
     }
+    win.webContents.send('pet:visibility', !hidden);
     updateVisibilityMenu(hidden);
   }
   petVisibility = { setHidden, isHidden: () => hidden };
@@ -150,6 +151,7 @@ function createPetWindow() {
     input.reset();
   }
   win.webContents.on('did-start-loading', resetInput);
+  win.webContents.on('did-finish-load', () => win.webContents.send('pet:visibility', !hidden));
   win.webContents.on('render-process-gone', resetInput);
   win.on('move', () => {
     panel.reposition();

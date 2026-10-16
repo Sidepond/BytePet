@@ -1,5 +1,5 @@
 import { appearanceReady, appearanceState, onAppearanceChanged } from './appearance-state.js';
-import { characters, drawCharacter } from './characters.js';
+import { characters, drawCharacter, charactersReady, CHARACTER_SIZE } from './characters.js';
 import { moduleEnabled, modulesReady, moduleState, onModulesChanged } from './module-state.js';
 import { enableFoodDrop, resultMessage } from './feeding.js';
 import { setupJwtPanel } from './jwt-panel.js';
@@ -7,7 +7,7 @@ import { setupJsonPanel } from './json-panel.js';
 import { setupFormatPanel } from './format-panel.js';
 import { setupPortsPanel } from './ports-panel.js';
 
-await Promise.all([modulesReady, appearanceReady]);
+await Promise.all([modulesReady, appearanceReady, charactersReady]);
 const draft = document.querySelector('#draft');
 const jwt = setupJwtPanel(draft, () => json.clear());
 const json = setupJsonPanel(draft, () => jwt.clear());
@@ -235,8 +235,9 @@ const characterButtons = characters.map(character => {
   button.type = 'button';
   button.dataset.character = character.id;
   button.setAttribute('aria-label', character.name);
+  button.title = `${character.name} · ${character.kind}`;
   const preview = document.createElement('canvas');
-  preview.width = preview.height = 24;
+  preview.width = preview.height = CHARACTER_SIZE;
   preview.setAttribute('aria-hidden', 'true');
   drawCharacter(preview.getContext('2d'), character.id);
   const label = document.createElement('span');

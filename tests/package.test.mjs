@@ -66,6 +66,14 @@ test('Package: standalone app preserves development data and restores the existi
       files: process.getBuiltinModule('fs').readdirSync(app.getAppPath()).sort(),
     }));
     assert.deepEqual(identity, { packaged: true, name: 'BytePet', profile, width: 128, files: ['desktop', 'package.json'] });
+    const spriteSizes = await pet.evaluate(async () => {
+      const { default: manifest } = await import('./sprite-manifest.js');
+      return Promise.all(Object.values(manifest).flatMap(character => Object.values(character.actions)).map(async ({ file }) => {
+        const image = new Image(); image.src = file; await image.decode();
+        return [image.naturalWidth, image.naturalHeight];
+      }));
+    });
+    assert.deepEqual(spriteSizes, Array.from({ length: 12 }, () => [384, 192]), 'all sprites load from the standalone archive');
     opened = application.waitForEvent('window');
     await pet.evaluate(() => window.petPanel.toggle());
     panel = await opened;

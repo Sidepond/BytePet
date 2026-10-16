@@ -1,0 +1,281 @@
+{
+  "version": 1,
+  "character": "retriever",
+  "catalogId": "dog-retriever",
+  "name": "허니",
+  "kind": "리트리버",
+  "provider": "PixelLab",
+  "presentation": "new-design",
+  "logicalFrame": {
+    "width": 48,
+    "height": 48
+  },
+  "frame": {
+    "width": 96,
+    "height": 96
+  },
+  "sourceScale": 2,
+  "columns": 4,
+  "rows": 2,
+  "frames": 8,
+  "pivot": {
+    "x": 48,
+    "y": 90
+  },
+  "actions": {
+    "idle": {
+      "file": "idle.png",
+      "durationMs": [
+        700,
+        180,
+        180,
+        180,
+        180,
+        180,
+        220,
+        400
+      ],
+      "frames": [
+        {
+          "sourceIndex": 0,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 8,
+            "top": 13,
+            "right": 39,
+            "bottom": 44,
+            "visible": 706
+          }
+        },
+        {
+          "sourceIndex": 1,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 7,
+            "top": 13,
+            "right": 39,
+            "bottom": 44,
+            "visible": 707
+          }
+        },
+        {
+          "sourceIndex": 2,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 7,
+            "top": 12,
+            "right": 39,
+            "bottom": 44,
+            "visible": 722
+          }
+        },
+        {
+          "sourceIndex": 3,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 6,
+            "top": 12,
+            "right": 39,
+            "bottom": 44,
+            "visible": 715
+          }
+        },
+        {
+          "sourceIndex": 4,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 5,
+            "top": 12,
+            "right": 39,
+            "bottom": 44,
+            "visible": 716
+          }
+        },
+        {
+          "sourceIndex": 5,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 6,
+            "top": 12,
+            "right": 39,
+            "bottom": 44,
+            "visible": 718
+          }
+        },
+        {
+          "sourceIndex": 6,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 7,
+            "top": 13,
+            "right": 39,
+            "bottom": 44,
+            "visible": 705
+          }
+        },
+        {
+          "sourceIndex": 7,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 7,
+            "top": 13,
+            "right": 39,
+            "bottom": 44,
+            "visible": 703
+          }
+        }
+      ],
+      "distinct": 8,
+      "closingPoseMatches": false,
+      "closingChangedPixels": 69,
+      "stepDifferences": [
+        1.2198350694444444,
+        9.451822916666666,
+        1.2873263888888888,
+        1.9228515625,
+        1.7315538194444444,
+        8.121202256944445,
+        2.6665581597222223,
+        1.8169487847222223
+      ],
+      "omittedSourceIndices": [
+        8
+      ]
+    },
+    "sleeping": {
+      "file": "sleeping.png",
+      "durationMs": [
+        450,
+        450,
+        450,
+        450,
+        450,
+        450,
+        450,
+        450
+      ],
+      "frames": [
+        {
+          "sourceIndex": 0,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 6,
+            "top": 26,
+            "right": 42,
+            "bottom": 44,
+            "visible": 522
+          }
+        },
+        {
+          "sourceIndex": 1,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 6,
+            "top": 25,
+            "right": 42,
+            "bottom": 44,
+            "visible": 530
+          }
+        },
+        {
+          "sourceIndex": 2,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 6,
+            "top": 23,
+            "right": 42,
+            "bottom": 44,
+            "visible": 553
+          }
+        },
+        {
+          "sourceIndex": 3,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 6,
+            "top": 22,
+            "right": 43,
+            "bottom": 44,
+            "visible": 569
+          }
+        },
+        {
+          "sourceIndex": 4,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 5,
+            "top": 23,
+            "right": 43,
+            "bottom": 44,
+            "visible": 566
+          }
+        },
+        {
+          "sourceIndex": 5,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 6,
+            "top": 24,
+            "right": 42,
+            "bottom": 44,
+            "visible": 538
+          }
+        },
+        {
+          "sourceIndex": 6,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 6,
+            "top": 25,
+            "right": 42,
+            "bottom": 44,
+            "visible": 526
+          }
+        },
+        {
+          "sourceIndex": 7,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 6,
+            "top": 26,
+            "right": 42,
+            "bottom": 44,
+            "visible": 526
+          }
+        }
+      ],
+      "distinct": 8,
+      "closingPoseMatches": false,
+      "closingChangedPixels": 63,
+      "stepDifferences": [
+        4.540907118055555,
+        9.317491319444445,
+        8.256510416666666,
+        5.145724826388889,
+        6.462782118055555,
+        7.693142361111111,
+        4.812934027777778,
+        1.2121310763888888
+      ],
+      "omittedSourceIndices": [
+        8
+      ]
+    }
+  }
+}

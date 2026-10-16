@@ -8,8 +8,8 @@ function rows(ctx, pixels, x, y, palette) {
   }));
 }
 
-export function drawDog(ctx, elapsed, { shape, palette: p }) {
-  const pose = getIdlePose(elapsed);
+export function drawDog(ctx, elapsed, { shape, palette: p }, overrides = {}) {
+  const pose = { ...getIdlePose(elapsed), ...overrides };
   ctx.clearRect(0, 0, 24, 24);
   ctx.imageSmoothingEnabled = false;
   ctx.fillStyle = '#33251f24';
@@ -65,6 +65,31 @@ export function drawDog(ctx, elapsed, { shape, palette: p }) {
   ctx.fillRect(8, 16, 9, 1);
   ctx.fillStyle = '#ffe293';
   ctx.fillRect(12, 17, 2, 2);
+}
+
+export function drawRestingDog(ctx, state, elapsed, character) {
+  const p = character.palette;
+  if (state === 'sleeping') {
+    drawDog(ctx, 0, character, { blink: true, lift: elapsed < 300 ? 1 : 2 });
+    return;
+  }
+  const stretching = state === 'stretching';
+  const active = elapsed >= 400 && elapsed < (stretching ? 2700 : 4200);
+  drawDog(ctx, 0, character, { blink: active, lift: stretching && active ? -1 : 0 });
+  if (!active) return;
+  if (stretching) {
+    const raised = elapsed >= 800 && elapsed <= 2300;
+    const arm = ['.oo.', 'occo', 'offo', ...Array(raised ? 8 : 3).fill('.ofo'), '.oo.'];
+    rows(ctx, arm, 2, raised ? 7 : 13, p);
+    rows(ctx, arm, 19, raised ? 7 : 13, p);
+    ctx.fillStyle = p.p;
+    ctx.fillRect(12, 14, 2, 2);
+  } else {
+    const y = 12 + Math.floor(elapsed / 300) % 2;
+    rows(ctx, ['.oo.', 'occo', 'offo', 'offo', 'offo', '.oo.'], 7, y, p);
+    ctx.fillStyle = p.p;
+    if (Math.floor(elapsed / 600) % 2) ctx.fillRect(11, 14, 1, 2);
+  }
 }
 
 export function drawEatingDog(ctx, elapsed, character) {

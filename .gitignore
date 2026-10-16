@@ -1,5 +1,12 @@
 node_modules/
 test-results/
 .DS_Store
+.env*
+!.env.example
 build/
 dist/
+# Local PixelLab request payloads and job records; keep the reusable PNG sources.
+art/**/*-request.json
+art/**/*-response.json
+art/**/*-job.json
+art/**/*-rejected-*.json

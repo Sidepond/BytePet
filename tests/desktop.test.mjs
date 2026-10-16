@@ -48,7 +48,7 @@ async function waitUntil(check) {
 
 async function petPoint(page, x, y) {
   const rect = await page.locator('#pet').boundingBox();
-  return { x: rect.x + x - 16, y: rect.y + y - 16 };
+  return { x: rect.x + (x - 16) * rect.width / 96, y: rect.y + (y - 16) * rect.height / 96 };
 }
 async function movePet(page, x, y) {
   const point = await petPoint(page, x, y);
@@ -94,14 +94,14 @@ test('Characters: six previews, live selection, reactions, hit regions and resta
       assert.equal(await panel.locator(`#character-picker button[data-character="${id}"]`).getAttribute('aria-pressed'), 'true');
       assert.deepEqual(await bounds(app), anchor, 'selection never moves the yard');
       const snapshot = await pet.locator('#pet').evaluate(canvas => ({ image: canvas.toDataURL(),
-        alpha: canvas.getContext('2d').getImageData(0, 0, 24, 24).data[3] }));
+        alpha: canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data[3] }));
       assert.equal(snapshot.alpha, 0, 'corner stays click-through');
       frames.add(snapshot.image);
       const hit = await pet.locator('#pet').evaluate(canvas => {
-        const pixels = canvas.getContext('2d').getImageData(0, 0, 24, 24).data;
-        const index = Array.from({ length: 576 }, (_, i) => i).find(i => pixels[i * 4 + 3] === 255);
+        const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+        const index = Array.from({ length: canvas.width * canvas.height }, (_, i) => i).find(i => pixels[i * 4 + 3] === 255);
         const rect = canvas.getBoundingClientRect();
-        return { x: rect.x + index % 24 * 4 + 2, y: rect.y + Math.floor(index / 24) * 4 + 2, corner: { x: rect.x + 1, y: rect.y + 1 } };
+        return { x: rect.x + index % canvas.width * rect.width / canvas.width + 1, y: rect.y + Math.floor(index / canvas.width) * rect.height / canvas.height + 1, corner: { x: rect.x + 1, y: rect.y + 1 } };
       });
       await app.evaluate((_electron, point) => { globalThis.characterCursor = point; }, { x: anchor.x + hit.x, y: anchor.y + hit.y });
       await waitUntil(() => app.evaluate(() => globalThis.characterIgnoring === false));
@@ -131,7 +131,7 @@ test('Characters: six previews, live selection, reactions, hit regions and resta
       ctx.fillStyle = '#f1f4f0'; ctx.fillRect(0, 0, 960, 840);
       ctx.font = '13px -apple-system, sans-serif'; ctx.textAlign = 'center';
       characters.forEach((character, col) => states.forEach((state, row) => {
-        const frame = document.createElement('canvas'); frame.width = frame.height = 24;
+        const frame = document.createElement('canvas'); frame.width = frame.height = 48;
         drawCharacter(frame.getContext('2d'), character.id, state, state === 'attack' ? 180 : 650);
         ctx.imageSmoothingEnabled = false;
         ctx.drawImage(frame, col * 160 + 32, row * 140 + 10, 96, 96);
@@ -158,6 +158,172 @@ test('Characters: six previews, live selection, reactions, hit regions and resta
   }
 });
 
+test('Sprites: all approved frames render exactly, previews match, and a missing sheet stays usable', { timeout: 30000 }, async t => {
+  const app = await launch(await profileFor(t));
+  try {
+    const { pet, panel } = await openPanel(app);
+    const report = await pet.evaluate(async () => {
+      const { characters, charactersReady, drawCharacter } = await import('./characters.js');
+      const { default: manifest } = await import('./sprite-manifest.js');
+      await charactersReady;
+      const actual = document.createElement('canvas');
+      const expected = document.createElement('canvas');
+      actual.width = actual.height = expected.width = expected.height = 48;
+      const ctx = expected.getContext('2d');
+      ctx.imageSmoothingEnabled = false;
+      const mismatches = [];
+      const idleFrames = {};
+      let checked = 0;
+      for (const { id } of characters) {
+        for (const action of ['idle', 'sleeping']) {
+          const metadata = manifest[id].actions[action];
+          const image = new Image(); image.src = metadata.file; await image.decode();
+          let elapsed = 0;
+          for (let frame = 0; frame < 8; frame++) {
+            ctx.clearRect(0, 0, 48, 48);
+            ctx.drawImage(image, frame % 4 * 96, Math.floor(frame / 4) * 96, 96, 96, 0, 0, 48, 48);
+            drawCharacter(actual.getContext('2d'), id, action, elapsed);
+            if (actual.toDataURL() !== expected.toDataURL()) mismatches.push(`${id}/${action}/${frame}`);
+            if (action === 'idle' && frame === 0) idleFrames[id] = actual.toDataURL();
+            elapsed += metadata.durationMs[frame]; checked++;
+          }
+        }
+      }
+      return { checked, mismatches, idleFrames };
+    });
+    assert.equal(report.checked, 96);
+    assert.deepEqual(report.mismatches, [], 'runtime uses the approved PNGs without changing the art');
+    const previews = await panel.locator('#character-picker button').evaluateAll(buttons => Object.fromEntries(
+      buttons.map(button => [button.dataset.character, button.querySelector('canvas').toDataURL()])));
+    for (const id of Object.keys(report.idleFrames)) assert.ok(previews[id] === report.idleFrames[id], `${id} preview matches the live sprite`);
+    const grounding = await pet.evaluate(() => {
+      const pet = document.querySelector('#pet').getBoundingClientRect();
+      const ground = document.querySelector('#yard-ground').getBoundingClientRect();
+      return { feet: pet.y + pet.height * 90 / 96, ground: ground.y };
+    });
+    assert.equal(grounding.feet, grounding.ground, 'shared pivot touches the top of the ground');
+    // Intercept one local sheet at Electron's protocol boundary; other poses and
+    // characters must load, and the app must remain interactive without it.
+    await app.evaluate(({ protocol, net }) => protocol.handle('file', async request => {
+      if (request.url.endsWith('/cat-cheese/idle.png')) return new Response('', { status: 404 });
+      return net.fetch(request.url, { bypassCustomProtocolHandlers: true });
+    }));
+    await pet.reload();
+    await pet.waitForFunction(() => document.querySelector('#pet').dataset.character === 'cat-cheese');
+    assert.ok(await pet.locator('#pet').evaluate(canvas => [...canvas.getContext('2d').getImageData(0, 0, 48, 48).data]
+      .some((value, i) => i % 4 === 3 && value === 255)), 'fallback is visible and has hit pixels');
+    await panel.locator('#show-settings').click();
+    await panel.locator('[data-character="dog-corgi"]').click();
+    await pet.waitForFunction(() => document.querySelector('#pet').dataset.character === 'dog-corgi');
+  } finally { await app.close(); }
+});
+
+test('Idle: resting gestures, waking on interaction, reaction priority and reduced motion', { timeout: 30000 }, async t => {
+  const app = await launch(await profileFor(t));
+  try {
+    const pet = await app.firstWindow();
+    await pet.waitForLoadState('load');
+    await pet.waitForFunction(() => document.querySelector('#pet').dataset.idle === 'idle');
+    const errors = [];
+    pet.on('pageerror', error => errors.push(error.message));
+    await pet.clock.install();
+    await pet.reload();
+    await pet.waitForFunction(() => document.querySelector('#pet').dataset.idle === 'idle');
+    await pet.clock.pauseAt(new Date());
+    await pet.emulateMedia({ reducedMotion: 'no-preference' });
+    await pet.evaluate(() => document.dispatchEvent(new Event('pointerup')));
+    await app.evaluate(({ ipcMain }) => {
+      ipcMain.on('pet:hit-region', (_event, region) => { globalThis.idleHitRegion = region; });
+    });
+    const anchor = await bounds(app);
+    const idleState = () => pet.locator('#pet').getAttribute('data-idle');
+    const seen = new Set();
+    for (let i = 0; i < 3; i++) {
+      await pet.clock.fastForward(24100);
+      const state = await idleState();
+      seen.add(state);
+      await pet.clock.fastForward(18000);
+      assert.equal(await idleState(), 'idle');
+    }
+    assert.deepEqual([...seen], ['sleeping']);
+    // Find the sleeping pose again and exercise its actual visible pixels.
+    for (let i = 0; i < 3; i++) {
+      await pet.clock.fastForward(24100);
+      if (await idleState() === 'sleeping') break;
+      await pet.clock.fastForward(18000);
+    }
+    assert.equal(await idleState(), 'sleeping');
+    await pet.clock.fastForward(2200);
+    const sleeping = await pet.locator('#pet').evaluate(canvas => {
+      const { data } = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+      const alpha = Array.from({ length: canvas.width * canvas.height }, (_, i) => data[i * 4 + 3]);
+      const index = alpha.findIndex(value => value === 255);
+      const rect = canvas.getBoundingClientRect();
+      return { alpha, x: rect.x + (index % canvas.width + 0.5) * rect.width / canvas.width, y: rect.y + (Math.floor(index / canvas.width) + 0.5) * rect.height / canvas.height };
+    });
+    assert.ok(sleeping.alpha.some(alpha => alpha === 255));
+    assert.equal(sleeping.alpha[0], 0);
+    await waitUntil(async () => JSON.stringify(await app.evaluate(() => globalThis.idleHitRegion?.alpha)) === JSON.stringify(sleeping.alpha));
+    assert.deepEqual(await bounds(app), anchor, 'gestures never move the native window');
+    const opened = app.waitForEvent('window');
+    await pet.mouse.click(sleeping.x, sleeping.y);
+    const panel = await opened;
+    await panel.waitForLoadState('load');
+    await waitUntil(async () => await idleState() === 'idle');
+    await pet.clock.fastForward(60000);
+    assert.equal(await idleState(), 'idle', 'an open menu keeps the pet awake');
+    await panel.locator('#close').click();
+    await waitUntil(async () => await pet.locator('#pet').getAttribute('aria-expanded') === 'false');
+    await pet.clock.fastForward(24100);
+    assert.notEqual(await idleState(), 'idle');
+    await pet.evaluate(() => window.food.saveText('쉬다가 먹기'));
+    await waitUntil(async () => await pet.locator('#pet').getAttribute('data-state') === 'eating');
+    assert.equal(await idleState(), '', 'feeding interrupts the resting animation');
+    await pet.clock.fastForward(1800);
+    assert.equal(await idleState(), 'idle');
+    await pet.clock.fastForward(11000);
+    assert.equal(await idleState(), 'idle', 'a reaction starts a fresh quiet-time delay');
+    await pet.clock.fastForward(24100);
+    assert.notEqual(await idleState(), 'idle');
+    await app.evaluate(({ Menu }) => Menu.getApplicationMenu().getMenuItemById('toggle-pet-visibility').click());
+    await waitUntil(async () => await pet.locator('#pet').getAttribute('data-visible') === 'false');
+    const hiddenFrame = await pet.locator('#pet').evaluate(canvas => canvas.toDataURL());
+    await pet.clock.fastForward(120000);
+    assert.equal(await pet.locator('#pet').evaluate(canvas => canvas.toDataURL()), hiddenFrame, 'hidden pets stop rendering');
+    await app.evaluate(({ Menu }) => Menu.getApplicationMenu().getMenuItemById('toggle-pet-visibility').click());
+    await waitUntil(async () => await pet.locator('#pet').getAttribute('data-visible') === 'true');
+    assert.equal(await idleState(), 'idle', 'showing the pet again clears stale sleeping time');
+    await pet.clock.fastForward(24100);
+    assert.notEqual(await idleState(), 'idle');
+    await pet.emulateMedia({ reducedMotion: 'reduce' });
+    await waitUntil(async () => await idleState() === 'idle');
+    const still = await pet.locator('#pet').evaluate(canvas => canvas.toDataURL());
+    await pet.clock.fastForward(120000);
+    assert.equal(await pet.locator('#pet').evaluate(canvas => canvas.toDataURL()), still);
+
+    const sheet = await pet.evaluate(async () => {
+      const { characters, drawCharacter } = await import('./characters.js');
+      const poses = [['idle', 900], ['sleeping', 2200]];
+      const sheet = document.createElement('canvas');
+      sheet.width = 960; sheet.height = 280;
+      const ctx = sheet.getContext('2d');
+      ctx.fillStyle = '#f1f4f0'; ctx.fillRect(0, 0, sheet.width, sheet.height);
+      ctx.font = '13px -apple-system, sans-serif'; ctx.textAlign = 'center';
+      characters.forEach((character, col) => poses.forEach(([state, elapsed], row) => {
+        const frame = document.createElement('canvas'); frame.width = frame.height = 48;
+        drawCharacter(frame.getContext('2d'), character.id, state, elapsed);
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(frame, col * 160 + 32, row * 140 + 10, 96, 96);
+        ctx.fillStyle = '#33473e'; ctx.fillText(`${character.name} · ${state}`, col * 160 + 80, row * 140 + 126);
+      }));
+      return sheet.toDataURL();
+    });
+    await mkdir(path.join(root, 'test-results'), { recursive: true });
+    await writeFile(path.join(root, 'test-results/idle-gestures.png'), Buffer.from(sheet.split(',')[1], 'base64'));
+    assert.deepEqual(errors, []);
+  } finally { await app.close(); }
+});
+
 test('F01: native transparent pet, idle playback, reduced motion, and clean exit', { timeout: 30000 }, async t => {
   const app = await launch(await profileFor(t));
   try {
@@ -168,7 +334,7 @@ test('F01: native transparent pet, idle playback, reduced motion, and clean exit
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await page.waitForFunction(() => {
       const canvas = document.querySelector('canvas');
-      return canvas && canvas.getContext('2d').getImageData(12, 10, 1, 1).data[3] > 0;
+      return canvas && canvas.dataset.character && canvas.getContext('2d').getImageData(24, 30, 1, 1).data[3] > 0;
     });
     const native = await app.evaluate(async ({ BrowserWindow, screen, Menu }) => {
       const win = BrowserWindow.getAllWindows().find(win => win.getTitle() === 'BytePet');
@@ -208,7 +374,7 @@ test('F01: native transparent pet, idle playback, reduced motion, and clean exit
 
     const rendering = await page.evaluate(() => {
       const canvas = document.querySelector('canvas');
-      const pixels = canvas.getContext('2d').getImageData(0, 0, 24, 24).data;
+      const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
       return {
         background: getComputedStyle(document.body).backgroundColor,
         size: canvas.getBoundingClientRect().width,
@@ -218,7 +384,7 @@ test('F01: native transparent pet, idle playback, reduced motion, and clean exit
       };
     });
     assert.equal(rendering.background, 'rgba(0, 0, 0, 0)');
-    assert.equal(rendering.size, 96);
+    assert.equal(rendering.size, 112);
     assert.equal(rendering.transparentCorner, 0);
     assert.ok(rendering.opaquePixels > 100);
     assert.equal(rendering.requireType, 'undefined');
@@ -442,10 +608,26 @@ test('F03: native input switches on visible pixels, follows animation, and stays
     await page.mouse.up();
     await waitUntil(async () => await ignoring() === true);
 
-    await movePet(page, 64, 64); // Hover holds roaming while testing the idle sprite's alpha.
-    // The ear moves under a stationary cursor. No mouse event is sent here.
-    await cursor({ x: 38, y: 26 });
-    assert.equal(await ignoring(), true);
+    await movePet(page, 64, 64);
+    // Find an actual silhouette change in the image pack. No mouse event is
+    // sent as the animation moves onto and off this stationary native cursor.
+    const changingPixel = await page.evaluate(async () => {
+      const { drawCharacter } = await import('./characters.js');
+      const canvas = document.createElement('canvas'); canvas.width = canvas.height = 48;
+      const ctx = canvas.getContext('2d');
+      drawCharacter(ctx, 'cat-cheese', 'idle', 0);
+      const first = ctx.getImageData(0, 0, 48, 48).data;
+      for (let time = 700; time < 2200; time += 180) {
+        drawCharacter(ctx, 'cat-cheese', 'idle', time);
+        const next = ctx.getImageData(0, 0, 48, 48).data;
+        for (let i = 0; i < 48 * 44; i++) {
+          if (first[i * 4 + 3] === 0 && next[i * 4 + 3] === 255) return { x: 16 + i % 48 * 2 + 1, y: 16 + Math.floor(i / 48) * 2 + 1 };
+        }
+      }
+    });
+    assert.ok(changingPixel, 'idle artwork changes its silhouette');
+    await cursor(changingPixel);
+    await waitUntil(async () => await ignoring() === true);
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await waitUntil(async () => await ignoring() === false);
     await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -1818,7 +2000,10 @@ test('Layout: cat stays still, left/right and ground switches apply immediately 
 
     await panel.locator('#menu-side').selectOption('right');
     await panel.waitForFunction(() => !document.querySelector('#menu-side').disabled && document.querySelector('#appearance-status').textContent.includes('저장했어요'));
-    assert.equal(await pet.locator('#pet').evaluate(el => el.getBoundingClientRect().x), 16);
+    assert.equal(await pet.locator('#pet').evaluate(el => {
+      const rect = el.getBoundingClientRect();
+      return rect.x + rect.width / 2;
+    }), 64);
     let house = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(win => win.getTitle() === 'BytePet 유틸리티').getBounds());
     let yard = await bounds(app);
     assert.equal(house.x + house.width, yard.x + yard.width);
@@ -1843,7 +2028,10 @@ test('Layout: cat stays still, left/right and ground switches apply immediately 
     await panel.locator('#show-ground').check();
     await pet.waitForFunction(() => innerWidth === 496 && !document.querySelector('#yard-ground').hidden);
     await panel.locator('#menu-side').selectOption('left');
-    await pet.waitForFunction(() => document.querySelector('#pet').getBoundingClientRect().x === innerWidth - 112);
+    await pet.waitForFunction(() => {
+      const rect = document.querySelector('#pet').getBoundingClientRect();
+      return rect.x + rect.width / 2 === innerWidth - 64;
+    });
     house = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(win => win.getTitle() === 'BytePet 유틸리티').getBounds());
     yard = await bounds(app);
     assert.equal(house.x, yard.x);
