@@ -28,10 +28,12 @@ BytePet은 바탕화면에 작은 친구와 자주 쓰는 도구를 함께 놓�
 
 1. [GitHub Releases](https://github.com/Sidepond/BytePet/releases)에서 사용할 버전의 **Assets**를 펼칩니다.
 2. 자신의 Mac에 맞는 `.dmg` 파일을 내려받습니다. `Source code`는 설치 파일이 아닙니다.
-3. DMG를 열고 **BytePet.app**을 **응용 프로그램(Applications)** 폴더로 옮깁니다.
-4. 응용 프로그램 폴더에서 **BytePet**을 실행합니다.
+3. DMG를 열고 **BytePet Tauri Preview.app**을 **응용 프로그램(Applications)** 폴더로 옮깁니다.
+4. 응용 프로그램 폴더에서 **BytePet Tauri Preview**를 실행합니다.
 
 현재 지원 대상은 **macOS**입니다. 제공되는 빌드와 지원 macOS 버전은 각 릴리스 설명을 확인해 주세요. 파일명이 아키텍처별로 나뉘어 있다면 Apple Silicon(M 시리즈)은 `arm64`, Intel Mac은 `x64`를 선택합니다.
+
+0.2 버전부터 Tauri 기반으로 실행합니다. 구버전 Electron 앱의 보관함과 설정은 [데이터 가져오기 안내](docs/tauri-migration.md#저장-데이터와-기존-데이터-가져오기)를 통해 옮길 수 있습니다.
 
 업데이트할 때는 BytePet을 종료하고 새 버전의 앱으로 교체하세요. 보관함과 설정은 앱과 별도 위치에 저장됩니다. Claude Code를 연결했다면 앱을 같은 경로에 유지해 주세요.
 
@@ -208,7 +210,7 @@ Claude 사용량은 상태줄에서 전달받은 값을 표시하므로, BytePet
 먹이와 설정은 Mac의 다음 폴더에 저장됩니다.
 
 ```text
-~/Library/Application Support/BytePet
+~/Library/Application Support/BytePet-Tauri
 ```
 
 - **텍스트·파일:** `food/`에 보관합니다. 앱의 **폴더 열기**로 접근할 수 있습니다.
@@ -217,7 +219,7 @@ Claude 사용량은 상태줄에서 전달받은 값을 표시하므로, BytePet
 - **JSON·JWT:** 로컬에서 처리하며 자동 저장하거나 외부 서버에 전송하지 않습니다. 입력 원문을 보관하려면 **먹이로 보내기 → 먹이 주기**를 누릅니다.
 - **AI 사용량:** Codex는 설치된 CLI를 통해 조회하고, Claude는 로컬 상태줄 연동을 사용합니다. Claude 사용량 캐시에는 사용률·초기화 시각·수신 시각만 기록하며 대화 내용이나 인증 정보를 저장하지 않습니다.
 
-Claude 연결 파일과 이전 상태줄 복원 기록은 Claude 설정 폴더의 `bytepet-usage/`에 별도로 저장됩니다. 기본 위치는 `~/.claude/bytepet-usage/`입니다.
+Claude 연결 파일과 이전 상태줄 복원 기록은 Claude 설정 폴더의 `bytepet-tauri-usage/`에 별도로 저장됩니다. 기본 위치는 `~/.claude/bytepet-tauri-usage/`입니다.
 
 
 </details>
@@ -280,6 +282,6 @@ Claude 연결 파일과 이전 상태줄 복원 기록은 Claude 설정 폴더�
 버그나 제안은 [GitHub Issues](https://github.com/Sidepond/BytePet/issues)에 남겨 주세요. 문제를 재현하는 순서와 함께 BytePet 버전, macOS 버전, Mac 종류(Apple Silicon·Intel)를 알려주시면 도움이 됩니다. 스크린샷이나 로그를 첨부할 때는 개인 파일 내용과 인증 정보를 가려 주세요.
 
 - [개발 환경·빌드·테스트 안내](docs/development.md)
-- [Tauri 전환 실험 · 실행과 데이터 가져오기](docs/tauri-migration.md)
+- [Tauri 실행과 기존 데이터 가져오기](docs/tauri-migration.md)
 - [기능 구현 현황과 후속 작업](docs/roadmap.md)
 - [캐릭터 규격과 생성 기록](art/pixellab-character-pack/README.md)

@@ -1,6 +1,6 @@
-# Tauri 전환 실험
+# Tauri 실행과 기존 데이터 가져오기
 
-`feat/tauri-migration` 브랜치의 macOS 전용 개발 버전입니다. 기존 Electron 앱을 유지하면서 같은 화면과 캐릭터 자산을 Tauri 2 / Rust / WKWebView로 실행합니다. 정식 배포로 전환하거나 원격 브랜치에 푸시하는 작업은 포함하지 않습니다.
+현재 `main`은 Tauri 2 / Rust / WKWebView 기반의 macOS 개발 버전입니다. Electron 실행 코드와 의존성은 제거했으며, 기존 화면·캐릭터 자산과 구버전 데이터 가져오기 기능을 유지합니다.
 
 ## 실행과 빌드
 
@@ -16,7 +16,7 @@ npm run package:tauri:preview
 - 개발 실행: `npm run tauri:dev`
 - 앱: `src-tauri/target/release/bundle/macos/BytePet Tauri Preview.app`
 - 미리보기 DMG: `dist/tauri-preview/` 아래 날짜·커밋·아키텍처별 폴더
-- Electron 비교 실행: `npm start` (기존 실행/패키징 명령 유지)
+- 기본 실행·빌드: `npm start`, `npm run build`, `npm run package:preview` (모두 Tauri)
 
 미리보기 앱은 ad-hoc 서명이며 Apple 공증을 받지 않았습니다. DMG는 Applications 바로가기와 앱을 포함하며 LZMA로 압축합니다. `build-info.json`과 `SHA256SUMS.txt`가 같이 생성됩니다. Tauri 런타임에는 Electron, Node.js 및 `node_modules`를 포함하지 않습니다. `desktop/`의 HTML/CSS/ES 모듈과 캐릭터 PNG만 준비하고 앱에 내장합니다.
 
@@ -68,8 +68,7 @@ npm run package:tauri:preview
 
 ```sh
 npm test
-npm run test:tauri
-npm run test:tauri:desktop
+npm run test:desktop
 cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 ```
 

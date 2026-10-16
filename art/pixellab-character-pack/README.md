@@ -2,6 +2,8 @@
 
 `npm run build:characters`로 생성한 로컬 `art/pixellab-character-pack/preview.html`에서 여섯 캐릭터를 동시에 볼 수 있다. 대기/잠자기/먹기/들기, 원본 크기/2배 확대, 일시 정지와 다음 프레임을 지원한다. 각 카드의 **프레임 자세히 보기**는 캐릭터별 기준 자세와 애니메이션을 비교하는 화면을 연다. HTML에 이미지를 내장해 오프라인으로 동작한다.
 
+제작 도구를 처음 사용할 때는 `npx playwright install chromium`으로 렌더링용 브라우저를 설치한다. 일반 앱 실행·빌드에는 필요하지 않다.
+
 대기·잠자기·먹기는 앱의 6종 모두에 적용했다. 들기는 현재 고양이 3종까지 완료했으며, 강아지 3종의 들기는 [후속 작업으로 보류](#dog-dragging-todo)했다. 미리보기의 들기에서 준비 중인 캐릭터는 기존 대기 이미지를 표시한다. `npm run sync:characters`로 PNG 21개와 재생 시간을 앱의 `desktop/` 경로에 복사한다. 대기·잠자기·먹기는 이 이미지로 재생한다. 먹이 저장 후 1.8초 동안 한입 먹고 씹는 모션을 보여주며, 변환 처리 중에는 먹기 모션을 빠르게 재생한다. 공격·성공/실패는 동일 외형에 작은 픽셀 효과를 표시한다. 그루밍은 이미지 제작 전까지 자동 재생하지 않는다. 공격·성공/실패 전용 이미지와 눕고 일어나는 전환은 다음 제작 범위다.
 
 | 캐릭터 | 종류 | 구분 요소 |
@@ -32,12 +34,13 @@
 
 ```sh
 npm run sprites:dragging -- shiba retriever corgi
+npx playwright install chromium
 npm run build:characters
 npm run sync:characters
 npm test
 npm run test:desktop
 npm run package:mac
-npm run test:package
+npm run package:preview
 ```
 
 완료 시 96×96 프레임·112×112 표시 크기를 유지하고, 머리의 불필요한 흔들림과 픽셀 잘림, 반복 연결, 놓을 때 착지, 취소·숨기기 복구, 동작 줄이기를 확인한다. 기존 대기·잠자기·먹기 이미지는 유지한다. 앱 PNG는 21개에서 24개, 전체 프레임은 168개에서 192개가 된다. `dragging-usage.json`과 이 문서의 수치·완료 상태를 갱신하고 위 항목을 체크한다.
@@ -72,6 +75,7 @@ npm run sprites:eating
 npm run build:character -- build tuxedo
 
 # API 호출 없이 전체 갤러리 재구성 및 검증
+npx playwright install chromium
 npm run build:characters
 
 # API 호출 없이 첫 디자인 모음 PNG 만들기

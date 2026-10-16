@@ -1,10 +1,9 @@
-import { readFile, writeFile, mkdir, mkdtemp, rm, access } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { readFile, writeFile, mkdir, access } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import assert from 'node:assert/strict';
-import { _electron as electron } from 'playwright';
+import { chromium } from 'playwright';
 import { profiles } from './pixellab-character-profiles.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -35,13 +34,10 @@ if (!posesOnly) for (const action of ['idle', 'sleeping', 'eating', 'dragging'])
   const available = pack.filter(pet => pet.sheets[action]);
   assert.equal(new Set(available.map(pet => pet.sheets[action])).size, available.length, `${action}: available sheets must be distinct`);
 }
-const scratch = await mkdtemp(path.join(tmpdir(), 'bytepet-gallery-'));
-await writeFile(path.join(scratch, 'main.cjs'), `const {app,BrowserWindow}=require('electron');app.setPath('userData',${JSON.stringify(path.join(scratch,'profile'))});app.whenReady().then(()=>new BrowserWindow({show:false,width:1120,height:1030}).loadURL('about:blank'));`);
-const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE;
 let app;
 try {
-  app = await electron.launch({ args: [path.join(scratch, 'main.cjs')], env });
-  const page = await app.firstWindow();
+  app = await chromium.launch();
+  const page = await app.newPage({ viewport: { width: 1120, height: 1030 }, deviceScaleFactor: 1 });
   if (posesOnly) {
     const png = await page.evaluate(async pack => {
       const canvas = document.createElement('canvas'); canvas.width = 6 * 224; canvas.height = 272;
@@ -110,4 +106,4 @@ try {
     await writeFile(path.join(directory, 'validation.json'), JSON.stringify(validation, null, 2) + '\n');
     console.log(JSON.stringify({ preview, ...validation }, null, 2));
   }
-} finally { await app?.close(); await rm(scratch, { recursive: true, force: true }); }
+} finally { await app?.close(); }

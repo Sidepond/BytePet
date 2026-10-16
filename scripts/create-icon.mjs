@@ -1,10 +1,9 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { _electron as electron } from 'playwright';
+import { chromium } from 'playwright';
 import manifest from '../desktop/sprite-manifest.js';
 
 const exec = promisify(execFile);
@@ -13,17 +12,12 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 // Use the approved Marmalade idle frame, with no separately drawn substitute.
 export async function createIcon(directory) {
   await mkdir(directory, { recursive: true });
-  const scratch = await mkdtemp(path.join(tmpdir(), 'bytepet-icon-'));
   const source = path.join(directory, 'BytePet.png');
   const sheet = await readFile(path.join(root, 'desktop', manifest['cat-cheese'].actions.idle.file));
-  const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE;
   let app;
   try {
-    await writeFile(path.join(scratch, 'main.cjs'), `const {app,BrowserWindow}=require('electron');
-app.setPath('userData',${JSON.stringify(path.join(scratch, 'profile'))});
-app.whenReady().then(()=>new BrowserWindow({show:false,webPreferences:{sandbox:true,contextIsolation:true}}).loadURL('about:blank'));`);
-    app = await electron.launch({ args: [path.join(scratch, 'main.cjs')], env });
-    const page = await app.firstWindow();
+    app = await chromium.launch();
+    const page = await app.newPage();
     const png = await page.evaluate(async data => {
       const image = new Image(); image.src = data; await image.decode();
       if (image.width !== 384 || image.height !== 192) throw new Error('Unexpected Marmalade sprite dimensions');
@@ -52,7 +46,6 @@ app.whenReady().then(()=>new BrowserWindow({show:false,webPreferences:{sandbox:t
     await writeFile(source, Buffer.from(png, 'base64'));
   } finally {
     if (app) await app.close();
-    await rm(scratch, { recursive: true, force: true });
   }
 
   const iconset = path.join(directory, 'BytePet.iconset');
@@ -66,4 +59,12 @@ app.whenReady().then(()=>new BrowserWindow({show:false,webPreferences:{sandbox:t
   const icon = path.join(directory, 'BytePet.icns');
   await exec('/usr/bin/iconutil', ['--convert', 'icns', iconset, '--output', icon]);
   return icon;
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const directory = path.join(root, 'build/icons');
+  const icon = await createIcon(directory);
+  await cp(icon, path.join(root, 'src-tauri/icons/icon.icns'));
+  await cp(path.join(directory, 'BytePet.png'), path.join(root, 'src-tauri/icons/icon.png'));
+  console.log('Updated Tauri app icons from the approved Marmalade frame.');
 }

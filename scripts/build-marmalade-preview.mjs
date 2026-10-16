@@ -1,9 +1,8 @@
-import { readFile, writeFile, mkdir, mkdtemp, rm, readdir, access } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { readFile, writeFile, mkdir, readdir, access } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import assert from 'node:assert/strict';
-import { _electron as electron } from 'playwright';
+import { chromium } from 'playwright';
 import { profiles } from './pixellab-character-profiles.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -29,15 +28,10 @@ for (const [action, pose] of actionSources) {
   assert.equal(files.length, prepare ? 1 : 9, `${action}: unexpected API frame count`);
   sources[action] = await Promise.all(files.map(name => dataURL(path.join(folder, name))));
 }
-const scratch = await mkdtemp(path.join(tmpdir(), 'bytepet-marmalade-'));
-await writeFile(path.join(scratch, 'main.cjs'), `const {app,BrowserWindow}=require('electron');
-app.setPath('userData',${JSON.stringify(path.join(scratch, 'profile'))});
-app.whenReady().then(()=>new BrowserWindow({show:false,width:1120,height:900}).loadURL('about:blank'));`);
-const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE;
 let app;
 try {
-  app = await electron.launch({ args: [path.join(scratch, 'main.cjs')], env });
-  const page = await app.firstWindow();
+  app = await chromium.launch();
+  const page = await app.newPage({ viewport: { width: 1120, height: 900 }, deviceScaleFactor: 1 });
   const result = await page.evaluate(async ({ sources, prepare, frameOrder, removeFloating }) => {
     const canvas = (width, height) => Object.assign(document.createElement('canvas'), { width, height });
     const bounds = frame => {
@@ -217,5 +211,5 @@ try {
   }
 } finally {
   await app?.close();
-  await rm(scratch, { recursive: true, force: true });
+
 }

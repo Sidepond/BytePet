@@ -1,64 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createResultService, COPY_LIMIT } from '../desktop/results.cjs';
 import { createReactionPlayer, CHEW_MS, RESULT_MS } from '../desktop/reaction.js';
 import { EATING_MS } from '../desktop/cat.js';
-
-function service(writeText = async () => {}) {
-  const handlers = new Map();
-  const listeners = new Map();
-  const messages = [];
-  const panel = { isDestroyed: () => false, webContents: { isDestroyed: () => false, mainFrame: {} } };
-  const pet = { isDestroyed: () => false, webContents: { isDestroyed: () => false, send: (...args) => messages.push(args) } };
-  const ipcMain = { handle: (key, fn) => handlers.set(key, fn), on: (key, fn) => listeners.set(key, fn),
-    removeHandler: key => handlers.delete(key), removeListener: key => listeners.delete(key) };
-  const instance = createResultService({ ipcMain, clipboard: { writeText }, pet, getPanel: () => panel });
-  return { handlers, listeners, panel, pet, messages, instance, event: { sender: panel.webContents, senderFrame: panel.webContents.mainFrame } };
-}
-
-test('results: copying waits for clipboard completion, preserves text, and reports failure', async () => {
-  let finish;
-  let copied;
-  const s = service(text => { copied = text; return new Promise(resolve => { finish = resolve; }); });
-  let settled = false;
-  const pending = s.handlers.get('results:copy')(s.event, '  한글 🐱\n900719925474099312345').then(value => { settled = true; return value; });
-  await Promise.resolve();
-  assert.equal(settled, false);
-  assert.match((await s.handlers.get('results:copy')(s.event, 'newer result')).error, /복사 중/);
-  assert.equal(copied, '  한글 🐱\n900719925474099312345');
-  finish();
-  assert.deepEqual(await pending, { ok: true });
-  const broken = service(async () => { throw new Error('private OS details'); });
-  const error = await broken.handlers.get('results:copy')(broken.event, '{}');
-  assert.equal(error.ok, false);
-  assert.match(error.error, /복사하지 못/);
-  assert.doesNotMatch(error.error, /private/);
-});
-
-test('results: only the panel main frame may copy or trigger reactions, with bounded input', async () => {
-  const writes = [];
-  const s = service(async text => writes.push(text));
-  const copy = s.handlers.get('results:copy');
-  const react = s.listeners.get('results:react');
-  for (const event of [{}, { sender: s.pet.webContents }, { sender: s.panel.webContents, senderFrame: {} }]) {
-    assert.equal((await copy(event, '{}')).ok, false);
-    react(event, 'success');
-  }
-  for (const text of ['', null, {}, 'x'.repeat(COPY_LIMIT + 1)]) assert.equal((await copy(s.event, text)).ok, false);
-  assert.deepEqual(writes, []);
-  assert.deepEqual(s.messages, []);
-  react(s.event, 'arbitrary');
-  react(s.event, 'success');
-  assert.deepEqual(s.messages, [['results:reaction', 'success']]);
-  s.pet.webContents.isDestroyed = () => true;
-  react(s.event, 'failure');
-  assert.equal(s.messages.length, 1);
-  s.panel.webContents.isDestroyed = () => true;
-  assert.equal((await copy(s.event, '{}')).ok, false);
-  s.instance.dispose();
-  assert.equal(s.handlers.size, 0);
-  assert.equal(s.listeners.size, 0);
-});
 
 function player() {
   let now = 0;
@@ -145,21 +88,4 @@ test('reaction: attacks await a matching outcome and never overwrite newer feedi
   assert.equal(p.history.at(-1).state, 'failure');
   p.advance(RESULT_MS);
   assert.equal(p.history.at(-1).state, 'idle');
-});
-
-test('results: disabling M01 rejects new copies and reactions and invalidates pending completion', async () => {
-  let finish;
-  const s = service(() => new Promise(resolve => { finish = resolve; }));
-  const copy = s.handlers.get('results:copy');
-  const pending = copy(s.event, 'already submitted');
-  s.instance.setEnabled(false);
-  assert.equal((await copy(s.event, 'blocked')).ok, false);
-  s.listeners.get('results:react')(s.event, 'success');
-  assert.equal(s.messages.length, 0);
-  s.instance.setEnabled(true);
-  finish();
-  assert.equal((await pending).ok, false, 'OFF/ON does not revive an old completion');
-  const resumed = copy(s.event, 'new result');
-  finish();
-  assert.equal((await resumed).ok, true);
 });

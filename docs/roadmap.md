@@ -1,6 +1,6 @@
 # BytePet 구현 현황과 후속 작업
 
-현재 구현은 Electron 기반 macOS 앱이다. 초기 기획의 Tauri 구성이나 용량·메모리 목표는 현재 앱의 사양으로 사용하지 않는다. 사용 방법은 [README](../README.md), 개발·검증 절차는 [개발 안내](development.md)에 정리한다.
+현재 구현은 Tauri 2 / Rust / WKWebView 기반 macOS 앱이다. Electron 실행 코드와 개발 의존성은 제거했으며 기존 데이터 가져오기를 지원한다. 사용 방법은 [README](../README.md), 개발·검증 절차는 [개발 안내](development.md)에 정리한다.
 
 ## 구현한 기능
 

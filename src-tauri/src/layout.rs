@@ -228,6 +228,77 @@ pub fn hit(r: &Value, x: f64, y: f64) -> bool {
 mod tests {
     use super::*;
     #[test]
+    fn alpha_hit_testing_rejects_transparent_pixels_and_invalid_regions() {
+        let region = serde_json::json!({
+            "x":16,"y":16,"width":96,"height":96,
+            "columns":2,"rows":2,"alpha":[0,255,36,0]
+        });
+        assert!(valid_region(&region));
+        for (x, y) in [
+            (16.0, 16.0),
+            (15.99, 80.0),
+            (80.0, 112.0),
+            (112.0, 30.0),
+            (80.0, 80.0),
+        ] {
+            assert!(!hit(&region, x, y));
+        }
+        assert!(hit(&region, 64.0, 16.0));
+        assert!(hit(&region, 16.0, 64.0));
+        assert!(!hit(&region, f64::NAN, 16.0));
+        for (key, value) in [
+            ("x", serde_json::json!(-1)),
+            ("width", serde_json::json!(200)),
+            ("columns", serde_json::json!(1.5)),
+            ("rows", serde_json::json!(0)),
+            ("alpha", serde_json::json!([0, 255])),
+            ("alpha", serde_json::json!([0, 255, -1, 0])),
+        ] {
+            let mut invalid = region.clone();
+            invalid[key] = value;
+            assert!(!valid_region(&invalid), "invalid {key}");
+        }
+    }
+    #[test]
+    fn placement_respects_negative_monitor_origins_and_small_work_areas() {
+        let area = Rect {
+            x: -1920.0,
+            y: 30.0,
+            width: 1920.0,
+            height: 1000.0,
+        };
+        assert_eq!(
+            initial(area, true),
+            Rect {
+                x: -520.0,
+                y: 878.0,
+                width: 496.0,
+                height: 128.0
+            }
+        );
+        let small = Rect {
+            x: 40.0,
+            y: 50.0,
+            width: 100.0,
+            height: 100.0,
+        };
+        assert_eq!(initial(small, true), small);
+        let saved = Rect {
+            x: -1600.0,
+            y: 100.0,
+            width: 496.0,
+            height: 128.0,
+        };
+        let primary = Rect {
+            x: 0.0,
+            y: 30.0,
+            width: 1440.0,
+            height: 870.0,
+        };
+        assert_eq!(nearest(saved, &[primary, area]), area);
+        assert_eq!(saved.clamp(area), saved);
+    }
+    #[test]
     fn panels_keep_height_and_badge_is_ground_anchored() {
         let area = Rect {
             x: 0.0,
