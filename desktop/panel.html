@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'">
     <title>BytePet 유틸리티</title>
     <link rel="stylesheet" href="panel.css">
   </head>
@@ -110,7 +110,8 @@
       </section>
       <section id="food-view" aria-label="먹이와 보관함">
         <div class="feeding-station">
-          <div class="station-heading"><h2>먹이 그릇</h2><span>텍스트 · 파일 · 사진</span></div>
+          <details id="food-composer">
+          <summary><span class="mini-bowl" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#icon-paw"/></svg></span><span id="composer-label">메모 남기기 · 파일 넣기</span><span class="composer-chevron" aria-hidden="true">⌄</span></summary>
           <div class="food-bowl">
             <label for="draft" class="sr-only">텍스트 먹이</label>
             <textarea id="draft" spellcheck="false" placeholder="메모를 적거나, 파일을 놓아주세요" aria-describedby="draft-hint"></textarea>
@@ -122,10 +123,16 @@
             <button id="feed-text" type="button" title="텍스트를 로컬 보관함에 저장">먹이 주기</button>
             <input id="files" type="file" multiple hidden>
           </div>
+          </details>
           <p id="feed-status" role="status" aria-live="polite"></p>
         </div>
         <section class="shelf" aria-labelledby="shelf-title">
           <div class="shelf-header"><h2 id="shelf-title">보관함 <span id="shelf-count">0</span></h2><button id="open-folder" type="button">폴더 열기</button></div>
+          <div class="shelf-search"><label for="shelf-search" class="sr-only">보관함 이름·메모 내용 검색</label><input id="shelf-search" type="search" maxlength="200" placeholder="이름·메모 내용 검색" autocomplete="off" spellcheck="false"><button id="clear-shelf-search" type="button" aria-label="검색 지우기" hidden>×</button></div>
+          <nav id="shelf-filters" aria-label="보관함 분류">
+            <button type="button" data-filter="all" aria-pressed="true">전체</button><button type="button" data-filter="note" aria-pressed="false">메모</button><button type="button" data-filter="image" aria-pressed="false">사진</button><button type="button" data-filter="file" aria-pressed="false">파일</button><button type="button" data-filter="trash" aria-pressed="false">휴지통</button>
+          </nav>
+          <p id="shelf-status" role="status" aria-live="polite"></p>
           <div class="shelf-cabinet">
             <ul id="food-list" aria-label="저장된 먹이"></ul>
             <p id="empty-shelf"><svg viewBox="0 0 48 48" aria-hidden="true"><use href="#icon-folder"/></svg><span>아직 비어 있어요</span><small>먹이를 주면 여기에 차곡차곡 모여요</small></p>
@@ -133,9 +140,11 @@
           <div id="shelf-selection" hidden>
             <p id="selected-food-name"></p>
             <div class="shelf-actions">
+              <button id="shelf-preview" type="button" title="미리보기 (Space)">미리보기</button>
               <button id="shelf-open" type="button">불러오기</button>
               <button id="shelf-convert" type="button">변환으로 보내기</button>
-              <button id="shelf-reveal" type="button">위치</button>
+              <button id="shelf-restore" type="button" hidden>복원</button>
+              <button id="shelf-more" type="button" aria-label="선택 항목의 추가 작업" aria-haspopup="menu">···</button>
             </div>
           </div>
         </section>
@@ -204,6 +213,19 @@
       </section>
       </div>
     </main>
+    <dialog id="food-preview" aria-labelledby="preview-title">
+      <header class="dialog-heading"><h2 id="preview-title">미리보기</h2><button id="close-food-preview" type="button" aria-label="미리보기 닫기">×</button></header>
+      <p id="preview-meta"></p><div id="preview-content" tabindex="0"></div>
+    </dialog>
+    <dialog id="food-rename" aria-labelledby="rename-title">
+      <form id="food-rename-form">
+        <h2 id="rename-title">보관함 이름 변경</h2>
+        <label for="food-name" class="sr-only">새 이름</label><input id="food-name" maxlength="160" required autocomplete="off">
+        <p class="rename-hint">보관함에 표시할 이름입니다. 원본 파일명과 내용은 유지됩니다.</p>
+        <p id="rename-status" role="status"></p>
+        <div class="dialog-actions"><button id="cancel-food-rename" type="button">취소</button><button id="save-food-name" type="submit">저장</button></div>
+      </form>
+    </dialog>
     <script type="module" src="panel.js"></script>
   </body>
 </html>

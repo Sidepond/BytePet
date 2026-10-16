@@ -9,6 +9,11 @@ import { fileURLToPath } from 'node:url';
 import { _electron as electron } from 'playwright';
 import { getInitialBounds } from '../desktop/window.cjs';
 
+async function fillFood(panel, text) {
+  if (!(await panel.locator('#food-composer').evaluate(el => el.open))) await panel.locator('#food-composer > summary').click();
+  await panel.locator('#draft').fill(text);
+}
+
 const root = fileURLToPath(new URL('../', import.meta.url));
 const jwtToken = (payload, header = { alg: 'HS256', typ: 'JWT' }, signature = 'AA') =>
   `${Buffer.from(JSON.stringify(header)).toString('base64url')}.${Buffer.from(JSON.stringify(payload)).toString('base64url')}.${signature}`;
@@ -35,6 +40,8 @@ async function openPanel(app) {
   await pet.evaluate(() => window.petPanel.toggle());
   const panel = await opened;
   await panel.waitForLoadState('load');
+  await panel.locator('#food-composer').waitFor();
+  if (!(await panel.locator('#food-composer').evaluate(el => el.open))) await panel.locator('#food-composer > summary').click();
   await panel.waitForFunction(() => document.activeElement?.id === 'draft');
   return { pet, panel };
 }
@@ -75,7 +82,7 @@ test('Characters: six previews, live selection, reactions, hit regions and resta
     pet.on('pageerror', error => errors.push(error.message));
     panel.on('pageerror', error => errors.push(error.message));
     await pet.emulateMedia({ reducedMotion: 'reduce' });
-    await panel.locator('#draft').fill('캐릭터를 바꿔도 남아 있을 메모');
+    await fillFood(panel, '캐릭터를 바꿔도 남아 있을 메모');
     await panel.locator('#show-settings').click();
     const anchor = await bounds(app);
     await app.evaluate(({ BrowserWindow, screen }) => {
@@ -745,6 +752,8 @@ test('F04: pet click toggles a focused panel, text survives hiding, and drag nev
     const panel = await opened;
     await panel.waitForLoadState('load');
     await waitUntil(panelVisible);
+    await panel.locator('#food-composer').waitFor();
+    if (!(await panel.locator('#food-composer').evaluate(el => el.open))) await panel.locator('#food-composer > summary').click();
     await panel.waitForFunction(() => document.activeElement?.id === 'draft');
     await waitUntil(async () => await app.evaluate(({ BrowserWindow }) => BrowserWindow.getFocusedWindow()?.getTitle()) === 'BytePet 유틸리티');
     assert.equal(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getFocusedWindow()?.getTitle()), 'BytePet 유틸리티');
@@ -821,6 +830,7 @@ test('F04: rapid toggles, panel following, and pet shutdown do not leave an orph
         result.x + result.width <= placement.x + placement.width && result.y + result.height <= placement.y + placement.height;
     });
     // Panel input remains available even when the pet itself is click-through.
+    if (!(await panel.locator('#food-composer').evaluate(el => el.open))) await panel.locator('#food-composer > summary').click();
     await panel.locator('#draft').click();
     await panel.keyboard.type('still editable');
     assert.equal(await panel.locator('#draft').inputValue(), 'still editable');
@@ -838,7 +848,7 @@ test('Tray: hide and restore the yard and open house without losing drafts or pl
   let app = await launch(profile);
   try {
     const { pet, panel } = await openPanel(app);
-    await panel.locator('#draft').fill('숨겼다가 돌아와도 남아 있는 메모');
+    await fillFood(panel, '숨겼다가 돌아와도 남아 있는 메모');
     const originalBounds = await bounds(app);
     // Observe the real tray's refreshed native menu, then exercise its callback.
     // No production test bridge or renderer access to the tray is exposed.
@@ -912,7 +922,7 @@ test('Tray: hiding while the house loads prevents ready events from showing it',
     assert.equal(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().some(win => win.isVisible())), false);
     await app.evaluate(({ Menu }) => Menu.getApplicationMenu().getMenuItemById('toggle-pet-visibility').click());
     await waitUntil(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().every(win => win.isVisible())));
-    await panel.locator('#draft').fill('복원 후 입력 가능');
+    await fillFood(panel, '복원 후 입력 가능');
     assert.equal(await panel.locator('#draft').inputValue(), '복원 후 입력 가능');
   } finally {
     await app.close();
@@ -929,7 +939,7 @@ test('F05: text and original image files persist, and only successful saves trig
     await panel.waitForFunction(() => document.querySelector('#feed-status').textContent.includes('입력해'));
     assert.notEqual(await pet.locator('canvas').getAttribute('data-state'), 'eating');
     const text = '  한글 🐱\n{"hello":"world"}\n';
-    await panel.locator('#draft').fill(text);
+    await fillFood(panel, text);
     await panel.locator('#feed-text').click();
     await panel.waitForFunction(() => document.querySelectorAll('#food-list li').length === 1);
     await pet.waitForFunction(() => document.querySelector('canvas').dataset.state === 'eating');
@@ -1036,7 +1046,7 @@ test('F05: partial file batches preserve successes; storage failures retain unsa
     await writeFile(path.join(blocked, 'food'), 'do not overwrite');
     app = await launch(blocked);
     ({ pet, panel } = await openPanel(app));
-    await panel.locator('#draft').fill('keep my unsaved input');
+    await fillFood(panel, 'keep my unsaved input');
     await panel.locator('#feed-text').click();
     await panel.waitForFunction(() => !document.querySelector('#feed-text').disabled && document.querySelector('#feed-status').classList.contains('error'));
     assert.equal(await panel.locator('#draft').inputValue(), 'keep my unsaved input');
@@ -1567,7 +1577,7 @@ test('F10: loading, empty lists, partial results, failures and retries preserve 
       });
     });
     assert.equal(await app.evaluate(() => globalThis.portCalls), 0, 'food view does not scan in the background');
-    await panel.locator('#draft').fill('keep this');
+    await fillFood(panel, 'keep this');
     await panel.locator('#show-ports').click();
     assert.equal(await panel.locator('#refresh-ports').isDisabled(), true);
     assert.match(await panel.locator('#port-status').textContent(), /조회하고/);
@@ -1917,7 +1927,7 @@ test('F13: turning food off cancels an in-flight write and late completion prese
         return write(...args);
       };
     });
-    await panel.locator('#draft').fill('cancel pending food');
+    await fillFood(panel, 'cancel pending food');
     await panel.locator('#feed-text').click();
     await waitUntil(() => app.evaluate(() => Boolean(globalThis.releasePendingFood)));
     await setModule(panel, 'm01', false);
@@ -2003,7 +2013,7 @@ test('Panel: separate drafts, icon grid navigation, and fixed bounds through por
     panel.on('pageerror', error => errors.push(error.message));
     const houseBounds = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(win => win.getTitle() === 'BytePet 유틸리티').getBounds());
     const initial = await houseBounds();
-    await panel.locator('#draft').fill('아직 저장하지 않은 메모');
+    await fillFood(panel, '아직 저장하지 않은 메모');
     await panel.locator('#show-convert').click();
     await panel.locator('#convert-draft').fill('{"separate":true}');
     await panel.locator('#run-tool').click();
@@ -2172,7 +2182,7 @@ test('Layout: cat stays still, left/right and ground switches apply immediately 
   let app = await launch(profile);
   try {
     let { pet, panel } = await openPanel(app);
-    await panel.locator('#draft').fill('keep this draft');
+    await fillFood(panel, 'keep this draft');
     await panel.locator('#close').click();
     await pet.emulateMedia({ reducedMotion: 'no-preference' });
     await pet.mouse.move(4, 4);

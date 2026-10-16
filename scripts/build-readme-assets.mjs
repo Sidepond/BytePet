@@ -33,7 +33,7 @@ try {
   const opened = app.waitForEvent('window');
   await pet.evaluate(() => window.petPanel.toggle());
   const panel = await opened;
-  await panel.waitForFunction(() => document.activeElement?.id === 'draft');
+  await panel.waitForFunction(() => document.activeElement?.matches('#food-composer > summary'));
   await panel.emulateMedia({ reducedMotion: 'reduce' });
   const capture = async name => {
     await panel.evaluate(() => document.activeElement?.blur());
@@ -60,6 +60,7 @@ try {
     execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'concat', '-safe', '0', '-i', path.join(folder, 'frames.txt'), '-filter_complex', '[0:v]split[a][b];[a]palettegen=reserve_transparent=1[p];[b][p]paletteuse=dither=none', '-fps_mode', 'vfr', '-frames:v', '8', '-final_delay', String(manifest[id].actions[action].durationMs[7] / 10), '-loop', '0', path.join(output, `${name}.gif`)]);
     if (id === 'cat-cheese' && action === 'idle') await savePNG('marmalade.png', frames[0]);
   }
+  await panel.locator('#food-composer > summary').click();
   await panel.locator('#draft').fill('오늘의 아이디어: 작업 공간에 작은 친구 한 마리.');
   await panel.locator('#feed-text').click();
   await panel.locator('#food-list li').first().waitFor();
@@ -70,7 +71,15 @@ try {
     { name: '마멀레이드.png', mimeType: 'image/png', buffer: await readFile(path.join(output, 'marmalade.png')) },
   ]);
   await panel.waitForFunction(() => document.querySelectorAll('#food-list li').length === 5);
+  await panel.locator('.file-thumbnail').waitFor();
+  await panel.waitForFunction(() => document.querySelector('#feed-status').textContent === '');
   await capture('food-shelf.png');
+  await panel.locator('.file-tile[data-kind=image]').click();
+  await panel.locator('#shelf-preview').click();
+  await panel.locator('#preview-content img').waitFor();
+  await panel.locator('#preview-content img').evaluate(image => image.decode());
+  await capture('food-preview.png');
+  await panel.locator('#close-food-preview').click();
 
   await panel.locator('#show-convert').click();
   await panel.locator('#convert-draft').fill('{"name":"BytePet","friends":6,"ready":true}');

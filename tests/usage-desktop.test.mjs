@@ -36,7 +36,7 @@ async function openPanel(app, pet) {
   await pet.evaluate(() => window.petPanel.toggle());
   await until(() => app.windows().some(w => w.url().endsWith('/panel.html')));
   const panel = app.windows().find(w => w.url().endsWith('/panel.html'));
-  await panel.waitForFunction(() => document.activeElement?.id === 'draft');
+  await panel.waitForFunction(() => document.activeElement?.matches('#food-composer > summary'));
   return panel;
 }
 

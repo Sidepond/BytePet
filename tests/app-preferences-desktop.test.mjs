@@ -5,6 +5,11 @@ import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { _electron as electron } from 'playwright';
+async function fillFood(panel, text) {
+  if (!(await panel.locator('#food-composer').evaluate(el => el.open))) await panel.locator('#food-composer > summary').click();
+  await panel.locator('#draft').fill(text);
+}
+
 const root = fileURLToPath(new URL('../', import.meta.url));
 const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE;
 const menu = (app, id) => app.evaluate(({ Menu }, id) => Menu.getApplicationMenu().getMenuItemById(id).click(), id);
@@ -36,7 +41,7 @@ test('Convenience: settings shortcut, version, dev login guard, hidden recovery,
     assert.equal((await f.pet.evaluate(() => window.appPreferences.setLogin(true))).ok, false);
     assert.equal(await app.evaluate(({ Menu }) => Menu.getApplicationMenu().getMenuItemById('open-settings').accelerator), 'CommandOrControl+,');
     await panel.locator('#show-food').click();
-    await panel.locator('#draft').fill('되돌려도 남아 있어야 하는 메모');
+    await fillFood(panel, '되돌려도 남아 있어야 하는 메모');
     await panel.locator('#draft').evaluate(el => { el.readOnly = true; });
     await panel.evaluate(() => window.appearance.set('ground', false));
     await panel.evaluate(() => window.appearance.set('menuSide', 'right'));

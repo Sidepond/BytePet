@@ -13,6 +13,10 @@ import { setupAppPreferences } from './app-preferences-panel.js';
 await Promise.all([modulesReady, appearanceReady, charactersReady]);
 const draft = document.querySelector('#draft');
 const convertDraft = document.querySelector('#convert-draft');
+const composer = document.querySelector('#food-composer');
+function syncComposer() { document.querySelector('#composer-label').textContent = draft.value ? '작성 중인 메모' : '메모 남기기 · 파일 넣기'; }
+function expandComposer() { composer.open = true; syncComposer(); draft.focus(); }
+draft.addEventListener('input', syncComposer);
 const jwt = setupJwtPanel(convertDraft, () => json.clear());
 const json = setupJsonPanel(convertDraft, () => jwt.clear());
 function clearResults() { jwt.clear(); json.clear(); }
@@ -24,10 +28,11 @@ const ports = setupPortsPanel();
 const usage = setupUsagePanel();
 const appPreferences = setupAppPreferences();
 let view = 'food';
+composer.addEventListener('toggle', () => { if (composer.open && view === 'food' && !document.querySelector('dialog[open]')) draft.focus(); });
 const shelf = setupFoodShelf({ enabled: () => moduleEnabled('m01'), feedback, isFoodView: () => view === 'food',
   onText(text, destination) {
     if (destination === 'convert') { convertDraft.value = text; draftChanged(); showView('convert'); }
-    else { draft.value = text; draft.focus(); }
+    else { draft.value = text; expandComposer(); }
   },
 });
 const refresh = () => shelf.refresh();
@@ -46,12 +51,13 @@ function renderView() {
   document.querySelector('#panel-title').textContent = labels[view];
 }
 function focusView() {
-  if (view === 'food' && moduleEnabled('m01')) draft.focus({ preventScroll: true });
+  if (view === 'food' && moduleEnabled('m01')) (composer.open ? draft : composer.querySelector('summary')).focus({ preventScroll: true });
   else if (view === 'convert' && moduleEnabled('m01')) convertDraft.focus({ preventScroll: true });
   else if (view === 'settings') document.querySelector('#character-picker button[aria-pressed="true"]').focus();
   else document.querySelector(`#show-${view}`).focus({ preventScroll: true });
 }
 function showView(next) {
+  if (next !== 'food') shelf.leave();
   view = next;
   document.body.classList.remove('food-over');
   renderView();
@@ -66,7 +72,10 @@ for (const name of Object.keys(labels)) document.querySelector(`#show-${name}`).
 document.querySelector('#enable-module').addEventListener('click', () => showView('settings'));
 let busy = false;
 let foodGeneration = 0;
+let feedbackTimer;
 function feedback(text, error = false) {
+  clearTimeout(feedbackTimer);
+  if (text && !error) feedbackTimer = setTimeout(() => { if (!busy && status.textContent === text) status.textContent = ''; }, 4000);
   status.textContent = text;
   status.classList.toggle('error', error);
 }
@@ -97,7 +106,7 @@ async function consume(operation) {
 document.querySelector('#feed-text').addEventListener('click', async () => {
   const text = draft.value;
   const result = await consume(() => window.food.saveText(text));
-  if (result?.ok && result.value.items.length && draft.value === text) { draft.value = ''; }
+  if (result?.ok && result.value.items.length && draft.value === text) { draft.value = ''; composer.open = false; syncComposer(); if (view === 'food') composer.querySelector('summary').focus({ preventScroll: true }); }
 });
 document.querySelector('#choose-files').addEventListener('click', () => { if (moduleEnabled('m01')) files.click(); });
 files.addEventListener('change', () => {
@@ -111,8 +120,9 @@ document.querySelector('#open-folder').addEventListener('click', async () => {
   const result = await window.food.folder();
   if (current === foodGeneration && !result.ok) feedback(result.error, true);
 });
-enableFoodDrop(document.body, consume, () => moduleEnabled('m01') && view === 'food');
+enableFoodDrop(document.body, consume, () => moduleEnabled('m01') && view === 'food' && !document.querySelector('dialog[open]'));
 document.addEventListener('paste', event => {
+  if (document.querySelector('dialog[open]') || (document.activeElement?.matches('input, textarea') && document.activeElement !== draft && document.activeElement !== convertDraft)) return;
   if (!['food', 'convert'].includes(view) || !moduleEnabled('m01')) return;
   const images = Array.from(event.clipboardData.files);
   if (images.length) {
@@ -125,7 +135,8 @@ document.addEventListener('paste', event => {
     event.preventDefault();
     input.value += event.clipboardData.getData('text/plain');
     if (view === 'convert') draftChanged();
-    input.focus();
+    if (view === 'food') expandComposer();
+    else input.focus();
   }
 });
 const sendToFood = document.querySelector('#send-to-food');
@@ -135,11 +146,12 @@ syncSendToFood();
 document.querySelector('#send-to-food').addEventListener('click', () => {
   if (!moduleEnabled('m01') || !convertDraft.value.trim()) return;
   draft.value = convertDraft.value;
+  composer.open = true; syncComposer();
   showView('food');
 });
 document.querySelector('#close').addEventListener('click', () => window.utilityPanel.close());
 document.addEventListener('keydown', event => {
-  if (event.key === 'Escape' && !event.isComposing) {
+  if (event.key === 'Escape' && !event.isComposing && !document.querySelector('dialog[open]')) {
     event.preventDefault();
     window.utilityPanel.close();
   }
@@ -152,6 +164,7 @@ window.utilityPanel.onOpen(requested => {
   else if (view === 'food') refresh();
   else if (view === 'settings') appPreferences.refresh();
 });
+window.food.onChanged(() => { if (moduleEnabled('m01')) refresh(); });
 window.food.onSaved(({ count }) => {
   if (!moduleEnabled('m01')) return;
   feedback(`${count}개를 보관함에 저장했어요.`);

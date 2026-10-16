@@ -123,7 +123,18 @@ contextBridge.exposeInMainWorld('food', {
       return ipcRenderer.invoke('food:save-files', sources);
     } catch { return { ok: false, error: '파일을 읽을 수 없어요. 다시 선택해 주세요.' }; }
   },
-  list: () => ipcRenderer.invoke('food:list'),
+  list: options => ipcRenderer.invoke('food:list', options),
+  thumbnail: (id, trash = false) => ipcRenderer.invoke('food:thumbnail', { id, trash }),
+  preview: (id, trash = false) => ipcRenderer.invoke('food:preview', { id, trash }),
+  rename: (id, name) => ipcRenderer.invoke('food:rename', { id, name }),
+  trash: id => ipcRenderer.invoke('food:trash', id),
+  restore: id => ipcRenderer.invoke('food:restore', id),
+  menu: (id, trash = false) => ipcRenderer.invoke('food:menu', { id, trash }),
+  onChanged: callback => {
+    const listener = () => callback();
+    ipcRenderer.on('food:changed', listener);
+    return () => ipcRenderer.removeListener('food:changed', listener);
+  },
   readText: id => ipcRenderer.invoke('food:read-text', id),
   open: id => ipcRenderer.invoke('food:open', id),
   reveal: id => ipcRenderer.invoke('food:reveal', id),

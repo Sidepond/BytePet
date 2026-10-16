@@ -13,6 +13,14 @@ class FoodError extends Error {}
 const safeName = name => Array.from(path.basename(String(name)).replace(/[\\/:*?"<>|\x00-\x1f]/g, '_')).slice(0, 160).join('') || 'file';
 
 function createFoodStore(directory) {
+  const mutations = new Map();
+  const location = (id, trash = false) => path.join(directory, ...(trash ? ['.trash'] : []), id);
+  function mutate(id, operation) {
+    const previous = mutations.get(id) || Promise.resolve();
+    const next = previous.catch(() => {}).then(operation);
+    mutations.set(id, next);
+    return next.finally(() => { if (mutations.get(id) === next) mutations.delete(id); });
+  }
   async function commit(kind, name, write, preview = '', signal) {
     signal?.throwIfAborted();
     const id = randomUUID();
@@ -34,19 +42,23 @@ function createFoodStore(directory) {
       throw error;
     }
   }
-  async function get(id, { signal } = {}) {
+  async function get(id, { signal, trash = false } = {}) {
     signal?.throwIfAborted();
     if (typeof id !== 'string' || !ID.test(id)) throw new FoodError('저장된 항목을 찾을 수 없어요.');
-    const item = JSON.parse(await fs.readFile(path.join(directory, id, 'meta.json'), { encoding: 'utf8', signal }));
+    const folder = location(id, trash);
+    if (!(await fs.lstat(folder)).isDirectory()) throw new FoodError('보관함 항목을 읽을 수 없어요.');
+    const expected = path.join(await fs.realpath(directory), ...(trash ? ['.trash'] : []), id);
+    if (await fs.realpath(folder) !== expected) throw new FoodError('보관함 항목을 읽을 수 없어요.');
+    const item = JSON.parse(await fs.readFile(path.join(folder, 'meta.json'), { encoding: 'utf8', signal }));
     if (item.id !== id || !['text', 'file'].includes(item.kind) || typeof item.name !== 'string' ||
       typeof item.filename !== 'string' || item.filename !== safeName(item.filename) || ['.', '..'].includes(item.filename) ||
       !Number.isSafeInteger(item.size) || item.size < 0 || !Number.isFinite(Date.parse(item.createdAt))) {
       throw new FoodError('보관함 항목을 읽을 수 없어요.');
     }
     signal?.throwIfAborted();
-    const file = path.join(directory, id, 'content', item.filename);
+    const file = path.join(folder, 'content', item.filename);
     const resolved = await fs.realpath(file);
-    const root = await fs.realpath(directory);
+    const root = await fs.realpath(folder);
     if (!resolved.startsWith(root + path.sep) || !(await fs.stat(resolved)).isFile()) throw new FoodError('저장된 파일을 찾을 수 없어요.');
     signal?.throwIfAborted();
     return { item, file: resolved };
@@ -93,20 +105,61 @@ function createFoodStore(directory) {
         return source.bytes.byteLength;
       }, '', signal);
     },
-    async list({ signal } = {}) {
+    async list({ signal, query = '', trash = false } = {}) {
       signal?.throwIfAborted();
+      if (typeof query !== 'string' || query.length > 200) throw new FoodError('검색어는 200자까지 입력할 수 있어요.');
+      const needle = query.trim().normalize('NFC').toLocaleLowerCase();
       let names;
-      try { names = await fs.readdir(directory); } catch (error) { if (error.code === 'ENOENT') return []; throw error; }
+      try { names = await fs.readdir(trash ? path.join(directory, '.trash') : directory); } catch (error) { if (error.code === 'ENOENT') return []; throw error; }
       const items = [];
       for (const id of names.filter(name => ID.test(name))) {
         signal?.throwIfAborted();
-        try { items.push((await get(id, { signal })).item); } catch { signal?.throwIfAborted(); /* A damaged item must not hide the rest of the shelf. */ }
+        try {
+          const { item, file } = await get(id, { signal, trash });
+          let matches = !needle || item.name.normalize('NFC').toLocaleLowerCase().includes(needle);
+          if (!matches && item.kind === 'text' && (await fs.stat(file)).size <= TEXT_LIMIT) {
+            matches = (await fs.readFile(file, { encoding: 'utf8', signal })).normalize('NFC').toLocaleLowerCase().includes(needle);
+          }
+          if (matches) items.push(item);
+        } catch { signal?.throwIfAborted(); /* A damaged item must not hide the rest of the shelf. */ }
       }
       return items.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     },
     get,
-    async readText(id, { signal } = {}) {
-      const { item, file } = await get(id, { signal });
+    rename(id, name, { signal } = {}) {
+      return mutate(id, async () => {
+        if (typeof name !== 'string' || !name.trim() || name.trim().length > 160 || /[\x00-\x1f]/.test(name)) throw new FoodError('이름은 1~160자로 입력해 주세요.');
+        const { item } = await get(id, { signal });
+        const updated = { ...item, name: name.trim() };
+        const temporary = path.join(location(id), `.meta-${randomUUID()}.tmp`);
+        try {
+          await fs.writeFile(temporary, JSON.stringify(updated), { flag: 'wx', mode: 0o600, signal });
+          signal?.throwIfAborted();
+          await fs.rename(temporary, path.join(location(id), 'meta.json'));
+          return updated;
+        } finally { await fs.rm(temporary, { force: true }).catch(() => {}); }
+      });
+    },
+    moveToTrash(id, { signal } = {}) {
+      return mutate(id, async () => {
+        const { item } = await get(id, { signal });
+        await fs.mkdir(path.join(directory, '.trash'), { recursive: true, mode: 0o700 });
+        if (!(await fs.lstat(path.join(directory, '.trash'))).isDirectory()) throw new FoodError('휴지통을 열 수 없어요.');
+        signal?.throwIfAborted();
+        await fs.rename(location(id), location(id, true));
+        return item;
+      });
+    },
+    restore(id, { signal } = {}) {
+      return mutate(id, async () => {
+        const { item } = await get(id, { signal, trash: true });
+        signal?.throwIfAborted();
+        await fs.rename(location(id, true), location(id));
+        return item;
+      });
+    },
+    async readText(id, { signal, trash = false } = {}) {
+      const { item, file } = await get(id, { signal, trash });
       if (item.kind !== 'text' || (await fs.stat(file)).size > TEXT_LIMIT) throw new FoodError('텍스트 항목만 불러올 수 있어요.');
       return fs.readFile(file, { encoding: 'utf8', signal });
     },

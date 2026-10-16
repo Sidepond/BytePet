@@ -11,6 +11,11 @@ import { _electron as electron } from 'playwright';
 import spriteManifest from '../desktop/sprite-manifest.js';
 
 const exec = promisify(execFile);
+async function fillFood(panel, text) {
+  if (!(await panel.locator('#food-composer').evaluate(el => el.open))) await panel.locator('#food-composer > summary').click();
+  await panel.locator('#draft').fill(text);
+}
+
 const root = fileURLToPath(new URL('../', import.meta.url));
 const bundle = path.join(root, 'dist', `BytePet-darwin-${process.arch}`, 'BytePet.app');
 const executablePath = path.join(bundle, 'Contents/MacOS/BytePet');
@@ -85,8 +90,8 @@ test('Package: standalone app preserves development data and restores the existi
     assert.equal(appPreferences.value.info.packaged, true);
     assert.equal(appPreferences.value.info.version, JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8')).version);
     assert.equal(appPreferences.value.login.available, false, 'isolated package tests never alter system login items');
-    await panel.getByText('개발 앱에서 저장한 먹이', { exact: true }).waitFor();
-    await panel.locator('#draft').fill('중복 실행 후에도 유지할 초안');
+    await panel.locator('.item-name').filter({ hasText: '개발 앱에서 저장한 먹이' }).waitFor();
+    await fillFood(panel, '중복 실행 후에도 유지할 초안');
     // Relaunch raises a real native window. Keep unrelated keyboard/IME input
     // from altering the seeded draft during the persistence assertion.
     await panel.locator('#draft').evaluate(draft => { draft.readOnly = true; });
