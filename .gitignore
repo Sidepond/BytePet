@@ -10,3 +10,22 @@ art/**/*-request.json
 art/**/*-response.json
 art/**/*-job.json
 art/**/*-rejected-*.json
+
+# Superseded prototypes and planning documents (local archive only).
+/art/cheese-sprite-v1/
+/art/cheese-sprite-v2/
+/art/cheese-pixellab-v1/
+/scripts/build-sprite-preview.mjs
+/scripts/build-pixellab-preview.mjs
+/scripts/pixellab-sprites.mjs
+/bytepet_prd.md
+/bytepet_feature_breakdown.md
+/art/marmalade-pixellab/README.md
+
+# Rebuildable art previews; keep approved sheets, sources, atlases and manifests.
+/art/**/preview.html
+/art/**/preview.png
+/art/**/*-preview.png
+/art/**/raw-*.png
+/art/**/validation.json
+/art/pixellab-character-pack/designs.png

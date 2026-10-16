@@ -17,7 +17,8 @@ async function fillFood(panel, text) {
 }
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const bundle = path.join(root, 'dist', `BytePet-darwin-${process.arch}`, 'BytePet.app');
+const bundle = process.env.BYTEPET_PACKAGE_TEST_BUNDLE ?? path.join(root, 'dist', `BytePet-darwin-${process.arch}`, 'BytePet.app');
+const expectedVersion = process.env.BYTEPET_PACKAGE_TEST_VERSION ?? JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8')).version;
 const executablePath = path.join(bundle, 'Contents/MacOS/BytePet');
 const devExecutable = createRequire(import.meta.url)('electron');
 const env = { ...process.env };
@@ -38,7 +39,7 @@ test('Package: macOS bundle identity, icon and local signature are valid', { ski
   assert.equal(info.CFBundleName, 'BytePet');
   assert.equal(info.CFBundleDisplayName, 'BytePet');
   assert.equal(info.CFBundleExecutable, 'BytePet');
-  assert.equal(info.CFBundleShortVersionString, JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8')).version);
+  assert.equal(info.CFBundleShortVersionString, expectedVersion);
   assert.ok((await stat(path.join(bundle, 'Contents/Resources', info.CFBundleIconFile))).size > 0);
   assert.deepEqual(await readFile(path.join(bundle, 'Contents/Resources', info.CFBundleIconFile)),
     await readFile(path.join(root, 'build/BytePet.icns')), 'bundle uses the BytePet artwork instead of the Electron icon');
@@ -88,7 +89,7 @@ test('Package: standalone app preserves development data and restores the existi
     const appPreferences = await panel.evaluate(() => window.appPreferences.get());
     assert.equal(appPreferences.ok, true);
     assert.equal(appPreferences.value.info.packaged, true);
-    assert.equal(appPreferences.value.info.version, JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8')).version);
+    assert.equal(appPreferences.value.info.version, expectedVersion);
     assert.equal(appPreferences.value.login.available, false, 'isolated package tests never alter system login items');
     await panel.locator('.item-name').filter({ hasText: '개발 앱에서 저장한 먹이' }).waitFor();
     await fillFood(panel, '중복 실행 후에도 유지할 초안');

@@ -12,9 +12,6 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron .",
-    "build:sprites": "node scripts/build-sprite-preview.mjs",
-    "sprites:pixellab": "node scripts/pixellab-sprites.mjs",
-    "build:pixellab": "node scripts/build-pixellab-preview.mjs",
     "sprites:marmalade": "node scripts/pixellab-new-character.mjs",
     "build:marmalade": "node scripts/build-marmalade-preview.mjs",
     "sprites:character": "node scripts/pixellab-new-character.mjs",
@@ -28,7 +25,8 @@
     "test:desktop": "node --test --test-concurrency=1 tests/desktop.test.mjs tests/app-preferences-desktop.test.mjs tests/food-shelf-desktop.test.mjs",
     "sprites:eating": "node scripts/generate-pixellab-eating.mjs",
     "sprites:dragging": "node scripts/generate-pixellab-dragging.mjs",
-    "test:usage-desktop": "node --test tests/usage-desktop.test.mjs"
+    "test:usage-desktop": "node --test tests/usage-desktop.test.mjs",
+    "package:preview": "node scripts/package-preview.mjs"
   },
   "devDependencies": {
     "@electron/packager": "20.3.0",

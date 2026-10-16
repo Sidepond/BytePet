@@ -277,6 +277,5 @@ Claude 연결 파일과 이전 상태줄 복원 기록은 Claude 설정 폴더�
 버그나 제안은 [GitHub Issues](https://github.com/Sidepond/BytePet/issues)에 남겨 주세요. 문제를 재현하는 순서와 함께 BytePet 버전, macOS 버전, Mac 종류(Apple Silicon·Intel)를 알려주시면 도움이 됩니다. 스크린샷이나 로그를 첨부할 때는 개인 파일 내용과 인증 정보를 가려 주세요.
 
 - [개발 환경·빌드·테스트 안내](docs/development.md)
-- [기능 구현 현황과 후속 작업](bytepet_feature_breakdown.md)
+- [기능 구현 현황과 후속 작업](docs/roadmap.md)
 - [캐릭터 규격과 생성 기록](art/pixellab-character-pack/README.md)
-- [초기 기획 문서](bytepet_prd.md) — 현재 앱과 다른 계획이 포함되어 있습니다.

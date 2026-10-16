@@ -4,7 +4,7 @@
 
 ## 로컬 실행
 
-macOS, Node.js **22.12.0 이상**, npm이 필요합니다. 현재 앱은 Electron 기반이며, 초기 PRD의 Tauri 구성과는 다릅니다.
+macOS, Node.js **22.12.0 이상**, npm이 필요합니다. 현재 앱은 Electron 기반입니다.
 
 ```sh
 npm ci
@@ -25,7 +25,7 @@ npm start -- --user-data-dir=/tmp/bytepet-dev-profile
 | `desktop/` | 펫 창, 집 메뉴, 로컬 보관함, 변환 도구, 포트 관리, AI 사용량 |
 | `desktop/assets/characters/` | 앱에 포함되는 캐릭터 PNG |
 | `desktop/sprite-manifest.js` | 스프라이트 경로와 재생 규격 |
-| `art/` | 캐릭터 원본·미리보기·생성 기록 |
+| `art/` | 현재 캐릭터 원본·승인 시트·규격·생성 기록 |
 | `scripts/` | 앱 패키징과 캐릭터 제작 도구 |
 | `tests/` | 단위·Electron GUI·패키지 테스트 |
 
@@ -61,7 +61,18 @@ npm run test:package
 
 패키지에는 `desktop/`과 실행에 필요한 앱 메타데이터만 포함합니다. 개발 도구, 테스트, 사용자 데이터와 API 키는 포함하지 않습니다. 생성물인 `build/`와 `dist/`는 Git에서 제외합니다.
 
-**현재 스크립트는 로컬용 ad-hoc 서명의 `.app`을 생성합니다.** DMG 생성, Apple Developer ID 서명, 공증, GitHub Releases 업로드는 포함하지 않습니다. README에서 안내하는 DMG를 배포하려면 이러한 배포 작업과 다른 Mac에서의 설치 검증을 별도로 진행해야 합니다. 자동 업데이트 기능은 아직 없습니다.
+테스트용 DMG는 다음 명령으로 만듭니다.
+
+```sh
+npm run package:preview
+# Intel 대상: npm run package:preview -- x64
+```
+
+`dist/preview/BytePet-<preview 버전>-<아키텍처>/`에 앱, DMG, SHA-256 체크섬, 빌드 정보와 설치 안내를 생성합니다. 버전에는 UTC 빌드 시각·커밋과 미커밋 변경 여부(`dirty`)가 포함됩니다. 기존 결과물을 덮어쓰지 않습니다.
+
+DMG는 **ULMO(LZMA)** 압축을 사용합니다. 동일 앱을 담은 기존 UDZO(zlib) DMG를 비교했을 때 약 124.3MiB에서 91.5MiB로 줄었습니다. 이번 최신 소스의 Preview DMG는 약 93MiB이며 파일 내용·파일시스템 배치에 따라 압축 크기는 달라집니다. 설치된 앱 크기는 약 287MiB로 동일합니다. 대부분이 Electron 런타임이며, 코드·이미지·아이콘을 합친 앱 리소스는 약 0.62MiB입니다. 런타임 라이브러리나 언어 리소스를 제거하지 않습니다.
+
+패키지와 Preview DMG 모두 **로컬 ad-hoc 서명**을 사용합니다. Developer ID 서명·Apple 공증·GitHub 게시·자동 업데이트는 포함하지 않습니다. 정식 배포 전 다른 Mac에서 설치를 검증해야 합니다.
 
 ## 앱 편의 설정
 
@@ -118,10 +129,7 @@ AI 사용량 PNG 2개는 `tests/usage-desktop.test.mjs`의 모의 사용량 화�
 ## 관련 문서
 
 - [사용자 README](../README.md)
-- [기능 분해 및 개발 순서](../bytepet_feature_breakdown.md)
-- [초기 PRD](../bytepet_prd.md)
-
-기획 문서의 목표와 현재 구현을 구분해 주세요. Electron 기반의 현재 앱이 PRD에 기록된 메모리·설치 용량 목표를 충족한다고 간주하지 않습니다.
+- [구현 현황과 후속 작업](roadmap.md)
 
 ## 보관함 동작
 
@@ -131,3 +139,11 @@ AI 사용량 PNG 2개는 `tests/usage-desktop.test.mjs`의 모의 사용량 화�
 - 이름 변경은 `meta.json`의 표시 이름만 원자적으로 갱신합니다. 보관된 원본 파일명·바이트는 그대로 둡니다.
 - 휴지통 이동은 `food/<id>`를 `food/.trash/<id>`로 이동하며, 복원은 동일한 ID로 되돌립니다. 앱 재시작 후에도 복원할 수 있고 자동 영구 삭제는 하지 않습니다. 휴지통 데이터도 로컬 디스크 공간을 사용합니다.
 - 새 미리보기·이름 변경·휴지통·컨텍스트 메뉴 IPC는 패널의 최상위 프레임에서만 허용됩니다. 모듈 OFF 시 진행 중인 UI 응답을 무효화하고 열린 대화상자를 닫습니다.
+
+## 저장소 관리 범위
+
+현재 6종 캐릭터의 생성 원본·참조 이미지·승인된 시트·atlas·manifest와 제작 도구는 유지합니다. 과거 치즈 고양이 실험 3종 및 전용 스크립트, 오래된 기획 문서는 추적에서 제외했습니다. 기획 문서는 [로드맵](roadmap.md)으로 통합했습니다. 정리 시점의 원본은 로컬 `build/repository-archive/`에도 보관합니다.
+
+`art/`의 생성된 HTML·스크린샷·원본 프레임 모음 이미지·검증 JSON은 Git에 넣지 않습니다. 새 체크아웃에서 `npm run build:characters`를 실행하면 누락된 캐릭터 미리보기도 저장된 원본으로 재구성합니다. API 호출은 없습니다. README에 필요한 `docs/images/`는 GitHub 표시를 위해 유지합니다.
+
+추적 제외는 이후 체크아웃의 파일 수를 줄이며, 과거 Git 커밋의 용량을 제거하지 않습니다. 이 작업에서는 Git 기록을 다시 쓰지 않습니다.

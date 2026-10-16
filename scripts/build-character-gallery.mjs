@@ -1,5 +1,6 @@
 import { readFile, writeFile, mkdir, mkdtemp, rm, access } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import assert from 'node:assert/strict';
@@ -20,7 +21,12 @@ for (const [id, profile] of Object.entries(profiles)) {
     const atlas = JSON.parse(await readFile(path.join(folder, 'atlas.json'), 'utf8'));
     assert.equal(atlas.frame.width, 96); assert.equal(atlas.frame.height, 96);
     assert.equal(atlas.frames, 8); assert.equal(atlas.pivot.y, 90);
-    await access(path.join(folder, 'preview.html'));
+    try { await access(path.join(folder, 'preview.html')); }
+    catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+      // Fresh checkouts omit generated previews; rebuild from retained local PNG sources.
+      execFileSync(process.execPath, [path.join(root, 'scripts/build-marmalade-preview.mjs'), 'build', id], { cwd: root, stdio: 'inherit' });
+    }
     pack.push({ id, catalogId: profile.catalogId, name: profile.name, kind: profile.kind, atlas,
       sheets: Object.fromEntries(await Promise.all(Object.keys(atlas.actions).map(async action => [action, await dataURL(path.join(folder, `${action}.png`))]))) });
   }
@@ -56,11 +62,13 @@ try {
     const preview = path.join(directory, 'preview.html');
     await writeFile(preview, template.replace('/* GENERATED_PACK */', `const pack = ${JSON.stringify(pack).replaceAll('<', '\\u003c')};`));
     const errors = []; page.on('pageerror', error => errors.push(error.message));
-    await page.emulateMedia({ reducedMotion: 'no-preference' }); await page.clock.install();
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    // Freeze before navigation so wall-clock drift cannot make pauseAt target the past.
+    await page.clock.install({ time: 0 }); await page.clock.pauseAt(10000);
     await page.goto(pathToFileURL(preview).href);
     await page.waitForFunction(() => document.body.dataset.ready === 'true');
     assert.equal(await page.locator('.card').count(), 6);
-    await page.clock.pauseAt(new Date()); await page.clock.runFor(750);
+    await page.clock.runFor(750);
     assert.deepEqual(await page.locator('.frame').allTextContents(), Array(6).fill('2 / 8'));
     await page.getByRole('button', { name: '일시 정지', exact: true }).click();
     const snapshots = await page.locator('.stage canvas').evaluateAll(canvases => canvases.map(canvas => canvas.toDataURL()));
