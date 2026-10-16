@@ -276,6 +276,133 @@
       "omittedSourceIndices": [
         8
       ]
+    },
+    "eating": {
+      "file": "eating.png",
+      "durationMs": [
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        400
+      ],
+      "frames": [
+        {
+          "sourceIndex": 0,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 8,
+            "top": 13,
+            "right": 39,
+            "bottom": 44,
+            "visible": 706
+          }
+        },
+        {
+          "sourceIndex": 1,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 7,
+            "top": 14,
+            "right": 39,
+            "bottom": 44,
+            "visible": 687
+          }
+        },
+        {
+          "sourceIndex": 2,
+          "offsetX": 0,
+          "offsetY": 1,
+          "bounds": {
+            "left": 7,
+            "top": 13,
+            "right": 38,
+            "bottom": 44,
+            "visible": 706
+          }
+        },
+        {
+          "sourceIndex": 3,
+          "offsetX": 0,
+          "offsetY": 1,
+          "bounds": {
+            "left": 7,
+            "top": 12,
+            "right": 39,
+            "bottom": 44,
+            "visible": 719
+          }
+        },
+        {
+          "sourceIndex": 4,
+          "offsetX": 0,
+          "offsetY": 1,
+          "bounds": {
+            "left": 6,
+            "top": 12,
+            "right": 38,
+            "bottom": 44,
+            "visible": 718
+          }
+        },
+        {
+          "sourceIndex": 5,
+          "offsetX": 0,
+          "offsetY": 1,
+          "bounds": {
+            "left": 7,
+            "top": 12,
+            "right": 38,
+            "bottom": 44,
+            "visible": 715
+          }
+        },
+        {
+          "sourceIndex": 6,
+          "offsetX": 0,
+          "offsetY": 1,
+          "bounds": {
+            "left": 7,
+            "top": 12,
+            "right": 38,
+            "bottom": 44,
+            "visible": 716
+          }
+        },
+        {
+          "sourceIndex": 7,
+          "offsetX": 0,
+          "offsetY": 0,
+          "bounds": {
+            "left": 7,
+            "top": 12,
+            "right": 39,
+            "bottom": 44,
+            "visible": 726
+          }
+        }
+      ],
+      "distinct": 8,
+      "closingPoseMatches": false,
+      "closingChangedPixels": 61,
+      "stepDifferences": [
+        8.23752170138889,
+        11.4755859375,
+        8.7001953125,
+        4.860026041666667,
+        2.7942708333333335,
+        4.862738715277778,
+        8.903645833333334,
+        10.787543402777779
+      ],
+      "omittedSourceIndices": [
+        8
+      ]
     }
   }
 }

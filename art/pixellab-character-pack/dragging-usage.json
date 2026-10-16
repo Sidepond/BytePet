@@ -1,0 +1,66 @@
+{
+  "completedRequests": 6,
+  "reportedGenerations": 6,
+  "pendingCharacters": [
+    "shiba",
+    "retriever",
+    "corgi"
+  ],
+  "blockedBy": "HTTP 402: insufficient credits",
+  "jobs": [
+    {
+      "character": "marmalade",
+      "stage": "drag-pose",
+      "status": "completed",
+      "usage": {
+        "type": "generations",
+        "generations": 1
+      }
+    },
+    {
+      "character": "marmalade",
+      "stage": "dragging",
+      "status": "completed",
+      "usage": {
+        "type": "generations",
+        "generations": 1
+      }
+    },
+    {
+      "character": "tuxedo",
+      "stage": "drag-pose",
+      "status": "completed",
+      "usage": {
+        "type": "generations",
+        "generations": 1
+      }
+    },
+    {
+      "character": "tuxedo",
+      "stage": "dragging",
+      "status": "completed",
+      "usage": {
+        "type": "generations",
+        "generations": 1
+      }
+    },
+    {
+      "character": "midnight",
+      "stage": "drag-pose",
+      "status": "completed",
+      "usage": {
+        "type": "generations",
+        "generations": 1
+      }
+    },
+    {
+      "character": "midnight",
+      "stage": "dragging",
+      "status": "completed",
+      "usage": {
+        "type": "generations",
+        "generations": 1
+      }
+    }
+  ]
+}

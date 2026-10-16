@@ -1,0 +1,60 @@
+{
+  "completedRequests": 6,
+  "reportedGenerations": 6,
+  "jobs": [
+    {
+      "character": "marmalade",
+      "stage": "eating",
+      "status": "completed",
+      "usage": {
+        "type": "generations",
+        "generations": 1
+      }
+    },
+    {
+      "character": "tuxedo",
+      "stage": "eating",
+      "status": "completed",
+      "usage": {
+        "type": "generations",
+        "generations": 1
+      }
+    },
+    {
+      "character": "midnight",
+      "stage": "eating",
+      "status": "completed",
+      "usage": {
+        "type": "generations",
+        "generations": 1
+      }
+    },
+    {
+      "character": "shiba",
+      "stage": "eating",
+      "status": "completed",
+      "usage": {
+        "type": "generations",
+        "generations": 1
+      }
+    },
+    {
+      "character": "retriever",
+      "stage": "eating",
+      "status": "completed",
+      "usage": {
+        "type": "generations",
+        "generations": 1
+      }
+    },
+    {
+      "character": "corgi",
+      "stage": "eating",
+      "status": "completed",
+      "usage": {
+        "type": "generations",
+        "generations": 1
+      }
+    }
+  ]
+}

@@ -1,8 +1,9 @@
 import manifest from './sprite-manifest.js';
 
 // The PNGs are exact 2× copies of 48px pixel art. Draw at logical resolution;
-// the pet displays it at 96px and settings at 48px, without blended pixels.
+// the pet displays it at 112px and settings at 48px with nearest-pixel scaling.
 export const CHARACTER_SIZE = 48;
+export const LANDING_MS = 300;
 const sheets = new Map();
 
 export function frameAt(durations, elapsed) {
@@ -35,26 +36,27 @@ export const charactersReady = typeof Image === 'undefined' ? Promise.resolve() 
 );
 
 const effects = {
-  eating: { color: '#d9984c', pixels: ['01110', '11111', '01110'] },
-  processing: { color: '#d9984c', pixels: ['01110', '11111', '01110'] },
   success: { color: '#e78d88', pixels: ['01010', '11111', '11111', '01110', '00100'] },
   failure: { color: '#c98654', pixels: ['010', '010', '010', '000', '010'] },
   attack: { color: '#e8b85c', pixels: ['00100', '00100', '11111', '00100', '00100'] },
 };
 
 export function drawSpriteCharacter(ctx, id, state, elapsed) {
-  const action = state === 'sleeping' ? 'sleeping' : 'idle';
+  const requested = state === 'eating' || state === 'processing' ? 'eating' : ['sleeping', 'dragging'].includes(state) ? state : 'idle';
+  const action = requested === 'dragging' && !sheets.has(`${id}/dragging`) ? 'idle' : requested;
   const image = sheets.get(`${id}/${action}`);
   if (!image) return false;
   const effect = effects[state];
-  const chewing = state === 'eating' || state === 'processing';
-  const time = chewing ? elapsed * 3 : elapsed;
-  const index = frameAt(manifest[id].actions[action].durationMs, time);
+  // Tool processing is brief; play the bite a little faster within that phase.
+  const time = state === 'processing' ? elapsed * 2 : elapsed;
+  const index = state === 'landing' ? 0 : frameAt(manifest[id].actions[action].durationMs, time);
+  // A brief pixel-aligned drop and one-pixel settling motion, with no stretching.
+  const offsetY = state === 'landing' ? [-4, -2, 0, 1, 0][Math.min(4, Math.floor(Math.max(0, elapsed) / (LANDING_MS / 5)))] : 0;
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
   ctx.save();
   ctx.imageSmoothingEnabled = false;
   ctx.scale(ctx.canvas.width / CHARACTER_SIZE, ctx.canvas.height / CHARACTER_SIZE);
-  ctx.drawImage(image, index % 4 * 96, Math.floor(index / 4) * 96, 96, 96, 0, 0, 48, 48);
+  ctx.drawImage(image, index % 4 * 96, Math.floor(index / 4) * 96, 96, 96, 0, offsetY, 48, 48);
   // Until dedicated reaction sheets are made, preserve the new silhouette and
   // show a small pixel cue above it. Never switch to the old pet mid-reaction.
   if (effect) {

@@ -1,13 +1,14 @@
-export function enableDragging(canvas, bridge, canStart = () => true, onActivate = () => {}) {
+export function enableDragging(canvas, bridge, canStart = () => true, onActivate = () => {}, onDragState = () => {}) {
   let gesture;
 
-  function finish() {
+  function finish(reason = 'cancel') {
     if (!gesture) return;
-    const { pointerId } = gesture;
+    const { pointerId, dragging } = gesture;
     gesture = null;
     bridge.end();
     canvas.classList.remove('dragging');
     if (canvas.hasPointerCapture(pointerId)) canvas.releasePointerCapture(pointerId);
+    if (dragging) onDragState(false, reason);
   }
 
   canvas.addEventListener('pointerdown', event => {
@@ -24,6 +25,7 @@ export function enableDragging(canvas, bridge, canStart = () => true, onActivate
       if (Math.hypot(event.screenX - gesture.x, event.screenY - gesture.y) < 4) return;
       gesture.dragging = true;
       canvas.classList.add('dragging');
+      onDragState(true, 'start');
     }
     bridge.move(Math.round(event.screenX), Math.round(event.screenY));
   });
@@ -31,11 +33,13 @@ export function enableDragging(canvas, bridge, canStart = () => true, onActivate
     if (!gesture || event.pointerId !== gesture.pointerId || event.button !== 0) return;
     const activate = !gesture.dragging && canStart(event) && Math.hypot(event.screenX - gesture.x, event.screenY - gesture.y) < 4;
     if (gesture.dragging) bridge.move(Math.round(event.screenX), Math.round(event.screenY));
-    finish();
+    finish('release');
     if (activate) onActivate();
   });
-  canvas.addEventListener('pointercancel', finish);
-  canvas.addEventListener('lostpointercapture', finish);
-  window.addEventListener('blur', finish);
-  window.addEventListener('pagehide', finish);
+  const cancel = () => finish();
+  canvas.addEventListener('pointercancel', cancel);
+  canvas.addEventListener('lostpointercapture', cancel);
+  window.addEventListener('blur', cancel);
+  window.addEventListener('pagehide', cancel);
+  return { cancel };
 }

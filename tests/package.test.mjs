@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { _electron as electron } from 'playwright';
+import spriteManifest from '../desktop/sprite-manifest.js';
 
 const exec = promisify(execFile);
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -73,7 +74,7 @@ test('Package: standalone app preserves development data and restores the existi
         return [image.naturalWidth, image.naturalHeight];
       }));
     });
-    assert.deepEqual(spriteSizes, Array.from({ length: 12 }, () => [384, 192]), 'all sprites load from the standalone archive');
+    assert.deepEqual(spriteSizes, Object.values(spriteManifest).flatMap(pet => Object.values(pet.actions).map(() => [384, 192])), 'all sprites load from the standalone archive');
     opened = application.waitForEvent('window');
     await pet.evaluate(() => window.petPanel.toggle());
     panel = await opened;

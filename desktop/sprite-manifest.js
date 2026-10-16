@@ -29,6 +29,32 @@ export default {
           450,
           450
         ]
+      },
+      "eating": {
+        "file": "./assets/characters/cat-cheese/eating.png",
+        "durationMs": [
+          200,
+          200,
+          200,
+          200,
+          200,
+          200,
+          200,
+          400
+        ]
+      },
+      "dragging": {
+        "file": "./assets/characters/cat-cheese/dragging.png",
+        "durationMs": [
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180
+        ]
       }
     }
   },
@@ -60,6 +86,32 @@ export default {
           450,
           450,
           450
+        ]
+      },
+      "eating": {
+        "file": "./assets/characters/cat-tuxedo/eating.png",
+        "durationMs": [
+          200,
+          200,
+          200,
+          200,
+          200,
+          200,
+          200,
+          400
+        ]
+      },
+      "dragging": {
+        "file": "./assets/characters/cat-tuxedo/dragging.png",
+        "durationMs": [
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180
         ]
       }
     }
@@ -93,6 +145,32 @@ export default {
           450,
           450
         ]
+      },
+      "eating": {
+        "file": "./assets/characters/cat-black/eating.png",
+        "durationMs": [
+          200,
+          200,
+          200,
+          200,
+          200,
+          200,
+          200,
+          400
+        ]
+      },
+      "dragging": {
+        "file": "./assets/characters/cat-black/dragging.png",
+        "durationMs": [
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180
+        ]
       }
     }
   },
@@ -124,6 +202,19 @@ export default {
           450,
           450,
           450
+        ]
+      },
+      "eating": {
+        "file": "./assets/characters/dog-shiba/eating.png",
+        "durationMs": [
+          200,
+          200,
+          200,
+          200,
+          200,
+          200,
+          200,
+          400
         ]
       }
     }
@@ -157,6 +248,19 @@ export default {
           450,
           450
         ]
+      },
+      "eating": {
+        "file": "./assets/characters/dog-retriever/eating.png",
+        "durationMs": [
+          200,
+          200,
+          200,
+          200,
+          200,
+          200,
+          200,
+          400
+        ]
       }
     }
   },
@@ -188,6 +292,19 @@ export default {
           450,
           450,
           450
+        ]
+      },
+      "eating": {
+        "file": "./assets/characters/dog-corgi/eating.png",
+        "durationMs": [
+          200,
+          200,
+          200,
+          200,
+          200,
+          200,
+          200,
+          400
         ]
       }
     }

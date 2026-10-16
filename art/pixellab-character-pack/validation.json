@@ -1,7 +1,7 @@
 {
   "characters": 6,
-  "actions": 12,
-  "displayedFrames": 96,
+  "actions": 21,
+  "displayedFrames": 168,
   "checks": [
     "six distinct characters",
     "matching frame size and floor",

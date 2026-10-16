@@ -1,4 +1,4 @@
-import { readFile, writeFile, mkdir, mkdtemp, rm, readdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, mkdtemp, rm, readdir, access } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -11,11 +11,18 @@ const character = process.argv[3] ?? 'marmalade';
 assert.ok(Object.hasOwn(profiles, character), 'Unknown character profile');
 const profile = profiles[character];
 const directory = path.join(root, 'art', `${character}-pixellab`);
-const prepare = ['prepare', 'prepare-design'].includes(process.argv[2]);
-assert.ok(process.argv[2] === undefined || process.argv[2] === 'build' || prepare, 'Usage: build-marmalade-preview.mjs [build|prepare|prepare-design] [character]');
+const prepare = ['prepare', 'prepare-design', 'prepare-drag'].includes(process.argv[2]);
+assert.ok(process.argv[2] === undefined || process.argv[2] === 'build' || prepare, 'Usage: build-marmalade-preview.mjs [build|prepare|prepare-design|prepare-drag] [character]');
 const dataURL = async file => `data:image/png;base64,${(await readFile(file)).toString('base64')}`;
 const sources = {};
-for (const [action, pose] of [['idle', 'design'], ['sleeping', 'sleep-pose-wide']]) {
+const actionSources = process.argv[2] === 'prepare-drag' ? [['dragging', 'drag-pose']] : [['idle', 'design'], ['sleeping', 'sleep-pose-wide']];
+if (!prepare) {
+  for (const action of ['eating', 'dragging']) {
+    try { await access(path.join(directory, 'source', action)); actionSources.push([action, action]); }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+  }
+}
+for (const [action, pose] of actionSources) {
   if (process.argv[2] === 'prepare-design' && action !== 'idle') continue;
   const folder = path.join(directory, 'source', prepare ? pose : action);
   const files = (await readdir(folder)).filter(name => /^\d\d\.png$/.test(name)).sort();
@@ -81,7 +88,7 @@ try {
       }
       if (prepare) {
         const box = bounds(raw[0]), reference = canvas(48, 48);
-        const x = Math.round(23.5 - (box.left + box.right) / 2), y = 44 - box.bottom;
+        const x = Math.round(23.5 - (box.left + box.right) / 2), y = (action === 'dragging' ? 40 : 44) - box.bottom;
         reference.getContext('2d').drawImage(raw[0], x, y);
         actions[action] = { png: reference.toDataURL(), offset: { x, y }, bounds: bounds(reference) };
         continue;
@@ -90,16 +97,17 @@ try {
       const contact = canvas(9 * 144, 144), cc = contact.getContext('2d'); cc.imageSmoothingEnabled = false;
       raw.forEach((frame, i) => cc.drawImage(frame, i * 144, 0, 144, 144));
       // Keep the generated whole-body motion. Only translate vertically to the
-      // shared floor; never paste body parts, resize individual poses or ping-pong.
+      // shared floor (held poses align the head height, leaving the paws free);
+      // never paste body parts, resize individual poses or ping-pong.
       const frames = [], signatures = [], framePixels = [];
       const order = frameOrder[action] ?? [0, 1, 2, 3, 4, 5, 6, 7];
       if (order.length !== 8 || order.some(i => !Number.isInteger(i) || i < 0 || i > 8)) throw new Error('Invalid frame order');
       for (const [i, sourceIndex] of order.entries()) {
         const clean = removeFloating.includes(action) ? withoutFloatingMarks(raw[sourceIndex]) : { frame: raw[sourceIndex], removed: 0 };
-        const before = bounds(clean.frame), y = 44 - before.bottom;
+        const before = bounds(clean.frame), y = action === 'dragging' ? 40 - bounds(raw[0]).bottom + bounds(raw[0]).top - before.top : 44 - before.bottom;
         const frame = canvas(48, 48); frame.getContext('2d').drawImage(clean.frame, 0, y);
         const after = bounds(frame);
-        if (after.visible !== before.visible || after.left < 1 || after.right > 46 || after.top < 1) throw new Error(`${action}/${i}: insufficient transparent margin`);
+        if (after.visible !== before.visible || after.left < 1 || after.right > 46 || after.top < 1 || after.bottom > 44) throw new Error(`${action}/${i}: insufficient transparent margin`);
         sc.drawImage(frame, i % 4 * 96, Math.floor(i / 4) * 96, 96, 96);
         signatures.push(frame.toDataURL());
         framePixels.push(frame.getContext('2d').getImageData(0, 0, 48, 48).data);
@@ -114,7 +122,8 @@ try {
       const stepDifferences = framePixels.map((data, i) => difference(data, framePixels[(i + 1) % 8]));
       actions[action] = { png: sheet.toDataURL(), contact: contact.toDataURL(), frames,
         distinct: new Set(signatures).size, closingPoseMatches, closingChangedPixels, stepDifferences,
-        durationMs: action === 'idle' ? [700, 180, 180, 180, 180, 180, 220, 400] : Array(8).fill(450) };
+        durationMs: action === 'idle' ? [700, 180, 180, 180, 180, 180, 220, 400]
+          : action === 'eating' ? [200, 200, 200, 200, 200, 200, 200, 400] : Array(8).fill(action === 'dragging' ? 180 : 450) };
     }
     return actions;
   }, { sources, prepare, frameOrder: profile.frameOrder ?? {}, removeFloating: profile.removeFloating ?? [] });
@@ -123,7 +132,7 @@ try {
     for (const [action, value] of Object.entries(result)) {
       await writeFile(path.join(directory, 'references', `${action}.png`), Buffer.from(value.png.split(',')[1], 'base64'));
     }
-    await writeFile(path.join(directory, 'reference-layout.json'), JSON.stringify(Object.fromEntries(Object.entries(result).map(([a, v]) => [a, { offset: v.offset, bounds: v.bounds }])), null, 2) + '\n');
+    await writeFile(path.join(directory, process.argv[2] === 'prepare-drag' ? 'drag-reference-layout.json' : 'reference-layout.json'), JSON.stringify(Object.fromEntries(Object.entries(result).map(([a, v]) => [a, { offset: v.offset, bounds: v.bounds }])), null, 2) + '\n');
     console.log('Prepared 48×48 references: original artwork translated/padded, never rescaled. No API request.');
   } else {
     for (const [action, value] of Object.entries(result)) {
@@ -138,10 +147,11 @@ try {
       // The generated terminal pose can differ in small details. Test the
       // actual 7→0 playback transition against the internal frame transitions.
       assert.ok(value.stepDifferences[7] <= Math.max(...value.stepDifferences.slice(0, 7)), `${action}: loop seam is more abrupt than internal motion`);
-      value.frames.forEach(frame => assert.equal(frame.bounds.bottom, 44));
+      if (action === 'dragging') assert.equal(new Set(value.frames.map(frame => frame.bounds.top)).size, 1, 'held poses share one head height');
+      else value.frames.forEach(frame => assert.equal(frame.bounds.bottom, 44));
       await writeFile(path.join(directory, `${action}.png`), Buffer.from(value.png.split(',')[1], 'base64'));
       await writeFile(path.join(directory, `raw-${action}.png`), Buffer.from(value.contact.split(',')[1], 'base64'));
-      atlas.actions[action] = { file: `${action}.png`, durationMs: value.durationMs, frames: value.frames,
+      atlas.actions[action] = { ...(action === 'dragging' ? { alignment: 'head-height' } : {}), file: `${action}.png`, durationMs: value.durationMs, frames: value.frames,
         distinct: value.distinct, closingPoseMatches: value.closingPoseMatches, closingChangedPixels: value.closingChangedPixels,
         stepDifferences: value.stepDifferences,
         omittedSourceIndices: Array.from({ length: 9 }, (_, i) => i).filter(i => !value.frames.some(frame => frame.sourceIndex === i)) };
@@ -169,6 +179,18 @@ try {
     await page.getByRole('button', { name: '다음 프레임', exact: true }).click();
     assert.equal(await page.locator('#frame').textContent(), '2 / 8');
     await page.screenshot({ path: path.join(directory, 'sleeping-preview.png') });
+    if (result.eating) {
+      await page.getByRole('button', { name: '먹기', exact: true }).click();
+      await page.getByRole('button', { name: '다음 프레임', exact: true }).click();
+      assert.equal(await page.locator('#frame').textContent(), '2 / 8');
+      await page.screenshot({ path: path.join(directory, 'eating-preview.png') });
+    }
+    if (result.dragging) {
+      await page.getByRole('button', { name: '들기', exact: true }).click();
+      await page.getByRole('button', { name: '다음 프레임', exact: true }).click();
+      assert.equal(await page.locator('#frame').textContent(), '2 / 8');
+      await page.screenshot({ path: path.join(directory, 'dragging-preview.png') });
+    }
     const blockAligned = await page.evaluate(() => Object.values(images).every(image => {
       if (image.width !== 384 || image.height !== 192) return false;
       const canvas = document.createElement('canvas'); canvas.width = 384; canvas.height = 192;

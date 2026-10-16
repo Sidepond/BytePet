@@ -13,6 +13,20 @@
       "closingChangedPixels": 14,
       "loopSeamDifference": 1.1493055555555556,
       "maxInternalDifference": 6.196723090277778
+    },
+    "eating": {
+      "distinct": 8,
+      "closingPoseMatches": false,
+      "closingChangedPixels": 5,
+      "loopSeamDifference": 7.898654513888889,
+      "maxInternalDifference": 9.590169270833334
+    },
+    "dragging": {
+      "distinct": 8,
+      "closingPoseMatches": false,
+      "closingChangedPixels": 3,
+      "loopSeamDifference": 3.412868923611111,
+      "maxInternalDifference": 7.074327256944445
     }
   },
   "checks": [

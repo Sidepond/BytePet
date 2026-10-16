@@ -6,10 +6,16 @@ import { enableDragging } from './drag.js';
 import { isCanvasHit, createHitRegionReporter } from './hit-test.js';
 import { enableFoodDrop, resultMessage } from './feeding.js';
 import { createIdleBehavior } from './idle-behavior.js';
+import { LANDING_MS } from './sprite-character.js';
 
 await Promise.all([modulesReady, appearanceReady, charactersReady]);
 const canvas = document.querySelector('#pet');
-enableDragging(canvas, window.petDrag, event => isCanvasHit(canvas, event), () => window.petPanel.toggle());
+let dragVisual = null;
+const petDragging = enableDragging(canvas, window.petDrag, event => isCanvasHit(canvas, event), () => window.petPanel.toggle(), (active, reason) => {
+  dragVisual = active ? { state: 'dragging', startedAt: performance.now() }
+    : reason === 'release' && !reducedMotion.matches && nativeVisible ? { state: 'landing', startedAt: performance.now() } : null;
+  updateAnimation();
+});
 enableDragging(document.querySelector('#yard-ground'), window.petDrag);
 let panelOpen = false;
 window.petPanel.onState(open => {
@@ -101,8 +107,11 @@ function render() {
     state = pose.state;
     elapsed = pose.elapsed;
   }
-  if (reducedMotion.matches) elapsed = reaction.state === 'eating' ? 1500 : reaction.state === 'attack' ? 150 : reaction.state === 'processing' ? 300 : 0;
-  canvas.dataset.idle = reaction.state === 'idle' ? state : '';
+  if (dragVisual?.state === 'landing' && (now - dragVisual.startedAt >= LANDING_MS || reducedMotion.matches)) dragVisual = null;
+  if (dragVisual) { state = dragVisual.state; elapsed = now - dragVisual.startedAt; }
+  if (reducedMotion.matches) elapsed = state === 'eating' ? 800 : state === 'attack' ? 150 : state === 'processing' ? 300 : 0;
+  canvas.dataset.motion = dragVisual?.state ?? '';
+  canvas.dataset.idle = reaction.state === 'idle' && !dragVisual ? state : '';
   drawCharacter(ctx, appearanceState().preferences.character, state, elapsed);
   reportHitRegion();
 }
@@ -140,6 +149,7 @@ onAppearanceChanged(applyAppearance);
 applyAppearance();
 window.petVisibility.onChanged(visible => {
   nativeVisible = visible;
+  if (!visible) { petDragging.cancel(); dragVisual = null; }
   canvas.dataset.visible = String(visible);
   updateAnimation();
 });

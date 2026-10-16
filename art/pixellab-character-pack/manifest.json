@@ -6,6 +6,12 @@
       "catalogId": "cat-cheese",
       "name": "마멀레이드",
       "kind": "치즈 고양이",
+      "actions": [
+        "idle",
+        "sleeping",
+        "eating",
+        "dragging"
+      ],
       "directory": "../marmalade-pixellab"
     },
     {
@@ -13,6 +19,12 @@
       "catalogId": "cat-tuxedo",
       "name": "오레오",
       "kind": "턱시도 고양이",
+      "actions": [
+        "idle",
+        "sleeping",
+        "eating",
+        "dragging"
+      ],
       "directory": "../tuxedo-pixellab"
     },
     {
@@ -20,6 +32,12 @@
       "catalogId": "cat-black",
       "name": "루나",
       "kind": "까망 고양이",
+      "actions": [
+        "idle",
+        "sleeping",
+        "eating",
+        "dragging"
+      ],
       "directory": "../midnight-pixellab"
     },
     {
@@ -27,6 +45,11 @@
       "catalogId": "dog-shiba",
       "name": "모찌",
       "kind": "시바",
+      "actions": [
+        "idle",
+        "sleeping",
+        "eating"
+      ],
       "directory": "../shiba-pixellab"
     },
     {
@@ -34,6 +57,11 @@
       "catalogId": "dog-retriever",
       "name": "허니",
       "kind": "리트리버",
+      "actions": [
+        "idle",
+        "sleeping",
+        "eating"
+      ],
       "directory": "../retriever-pixellab"
     },
     {
@@ -41,6 +69,11 @@
       "catalogId": "dog-corgi",
       "name": "비스킷",
       "kind": "코기",
+      "actions": [
+        "idle",
+        "sleeping",
+        "eating"
+      ],
       "directory": "../corgi-pixellab"
     }
   ],
@@ -50,7 +83,9 @@
   },
   "states": [
     "idle",
-    "sleeping"
+    "sleeping",
+    "eating",
+    "dragging"
   ],
   "framesPerState": 8
 }

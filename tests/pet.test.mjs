@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { getInitialBounds, getVisibleBounds, getPanelBounds, getYardBoundsForPanel } from '../desktop/window.cjs';
 import { createPositionStore } from '../desktop/position-store.cjs';
-import { getIdlePose, CYCLE_MS } from '../desktop/cat.js';
+import { getIdlePose, CYCLE_MS, EATING_MS } from '../desktop/cat.js';
 import { isHitRegion, hitsRegion, createPetInput } from '../desktop/input.cjs';
 import { characters, drawLegacyCharacter as drawCharacter } from '../desktop/characters.js';
 import { frameAt } from '../desktop/sprite-character.js';
@@ -224,6 +224,8 @@ test('hiding the ground also releases its native mouse interception', t => {
 
 test('image pack frame timing honors each hold and loops at the exact boundary', () => {
   for (const character of Object.values(manifest)) {
+    assert.equal(character.actions.eating.durationMs.reduce((total, ms) => total + ms, 0), EATING_MS,
+      'a complete bite finishes before the feeding reaction returns to idle');
     for (const { durationMs } of Object.values(character.actions)) {
       let elapsed = 0;
       durationMs.forEach((duration, index) => {

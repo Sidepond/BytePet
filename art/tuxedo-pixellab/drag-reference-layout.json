@@ -1,0 +1,15 @@
+{
+  "dragging": {
+    "offset": {
+      "x": 0,
+      "y": -4
+    },
+    "bounds": {
+      "left": 10,
+      "top": 1,
+      "right": 38,
+      "bottom": 40,
+      "visible": 766
+    }
+  }
+}

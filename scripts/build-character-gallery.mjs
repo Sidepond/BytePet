@@ -22,10 +22,13 @@ for (const [id, profile] of Object.entries(profiles)) {
     assert.equal(atlas.frames, 8); assert.equal(atlas.pivot.y, 90);
     await access(path.join(folder, 'preview.html'));
     pack.push({ id, catalogId: profile.catalogId, name: profile.name, kind: profile.kind, atlas,
-      sheets: Object.fromEntries(await Promise.all(['idle', 'sleeping'].map(async action => [action, await dataURL(path.join(folder, `${action}.png`))]))) });
+      sheets: Object.fromEntries(await Promise.all(Object.keys(atlas.actions).map(async action => [action, await dataURL(path.join(folder, `${action}.png`))]))) });
   }
 }
-if (!posesOnly) for (const action of ['idle', 'sleeping']) assert.equal(new Set(pack.map(pet => pet.sheets[action])).size, 6, `${action}: all character sheets must be distinct`);
+if (!posesOnly) for (const action of ['idle', 'sleeping', 'eating', 'dragging']) {
+  const available = pack.filter(pet => pet.sheets[action]);
+  assert.equal(new Set(available.map(pet => pet.sheets[action])).size, available.length, `${action}: available sheets must be distinct`);
+}
 const scratch = await mkdtemp(path.join(tmpdir(), 'bytepet-gallery-'));
 await writeFile(path.join(scratch, 'main.cjs'), `const {app,BrowserWindow}=require('electron');app.setPath('userData',${JSON.stringify(path.join(scratch,'profile'))});app.whenReady().then(()=>new BrowserWindow({show:false,width:1120,height:1030}).loadURL('about:blank'));`);
 const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE;
@@ -68,6 +71,14 @@ try {
     await page.getByRole('button', { name: '다음 프레임', exact: true }).click();
     assert.deepEqual(await page.locator('.frame').allTextContents(), Array(6).fill('2 / 8'));
     await page.screenshot({ path: path.join(directory, 'sleeping-preview.png'), fullPage: true });
+    await page.getByRole('button', { name: '먹기', exact: true }).click();
+    await page.getByRole('button', { name: '다음 프레임', exact: true }).click();
+    assert.deepEqual(await page.locator('.frame').allTextContents(), Array(6).fill('2 / 8'));
+    await page.screenshot({ path: path.join(directory, 'eating-preview.png'), fullPage: true });
+    await page.getByRole('button', { name: '들기', exact: true }).click();
+    await page.getByRole('button', { name: '다음 프레임', exact: true }).click();
+    assert.deepEqual(await page.locator('.frame').allTextContents(), pack.map(pet => pet.sheets.dragging ? '2 / 8' : '준비 중'));
+    await page.screenshot({ path: path.join(directory, 'dragging-preview.png'), fullPage: true });
     await page.locator('#zoom').selectOption('1');
     assert.ok(await page.locator('.stage canvas').evaluateAll(canvases => canvases.every(canvas => canvas.getBoundingClientRect().width === 96)));
     await page.getByRole('button', { name: '재생', exact: true }).click();
@@ -82,10 +93,11 @@ try {
     await page.clock.runFor(1200);
     assert.deepEqual(await page.locator('.frame').allTextContents(), Array(6).fill('1 / 8'), 'reduced motion starts paused');
     assert.deepEqual(errors, []);
-    const manifest = { version: 1, characters: pack.map(({ id, catalogId, name, kind }) => ({ id, catalogId, name, kind, directory: `../${id}-pixellab` })),
-      frame: { width: 96, height: 96 }, states: ['idle', 'sleeping'], framesPerState: 8 };
+    const manifest = { version: 1, characters: pack.map(({ id, catalogId, name, kind, atlas }) => ({ id, catalogId, name, kind, actions: Object.keys(atlas.actions), directory: `../${id}-pixellab` })),
+      frame: { width: 96, height: 96 }, states: ['idle', 'sleeping', 'eating', 'dragging'], framesPerState: 8 };
     await writeFile(path.join(directory, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
-    const validation = { characters: 6, actions: 12, displayedFrames: 96,
+    const actionCount = pack.reduce((count, pet) => count + Object.keys(pet.atlas.actions).length, 0);
+    const validation = { characters: 6, actions: actionCount, displayedFrames: actionCount * 8,
       checks: ['six distinct characters', 'matching frame size and floor', 'all playback advances', 'all pause', 'action and frame selection', '96px actual size', 'detail links exist', 'reduced motion on change and initial load', 'mobile overflow', 'no page errors'] };
     await writeFile(path.join(directory, 'validation.json'), JSON.stringify(validation, null, 2) + '\n');
     console.log(JSON.stringify({ preview, ...validation }, null, 2));

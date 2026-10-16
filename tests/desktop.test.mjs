@@ -175,7 +175,7 @@ test('Sprites: all approved frames render exactly, previews match, and a missing
       const idleFrames = {};
       let checked = 0;
       for (const { id } of characters) {
-        for (const action of ['idle', 'sleeping']) {
+        for (const action of Object.keys(manifest[id].actions)) {
           const metadata = manifest[id].actions[action];
           const image = new Image(); image.src = metadata.file; await image.decode();
           let elapsed = 0;
@@ -188,10 +188,18 @@ test('Sprites: all approved frames render exactly, previews match, and a missing
             elapsed += metadata.durationMs[frame]; checked++;
           }
         }
+        const visiblePixels = () => [...actual.getContext('2d').getImageData(0, 0, 48, 48).data]
+          .filter((value, i) => i % 4 === 3 && value > 0).length;
+        drawCharacter(actual.getContext('2d'), id, 'idle', 0);
+        const standingPixels = visiblePixels();
+        for (const time of [0, 60, 120, 180, 240, 300]) {
+          drawCharacter(actual.getContext('2d'), id, 'landing', time);
+          if (visiblePixels() !== standingPixels) mismatches.push(`${id}/landing/${time}: clipped or scaled`);
+        }
       }
-      return { checked, mismatches, idleFrames };
+      return { checked, expected: Object.values(manifest).reduce((sum, pet) => sum + Object.keys(pet.actions).length * 8, 0), mismatches, idleFrames };
     });
-    assert.equal(report.checked, 96);
+    assert.equal(report.checked, report.expected);
     assert.deepEqual(report.mismatches, [], 'runtime uses the approved PNGs without changing the art');
     const previews = await panel.locator('#character-picker button').evaluateAll(buttons => Object.fromEntries(
       buttons.map(button => [button.dataset.character, button.querySelector('canvas').toDataURL()])));
@@ -215,6 +223,64 @@ test('Sprites: all approved frames render exactly, previews match, and a missing
     await panel.locator('#show-settings').click();
     await panel.locator('[data-character="dog-corgi"]').click();
     await pet.waitForFunction(() => document.querySelector('#pet').dataset.character === 'dog-corgi');
+  } finally { await app.close(); }
+});
+
+test('Dragging: threshold, suspended motion, landing, cancellation, ground and reduced motion', { timeout: 30000 }, async t => {
+  const app = await launch(await profileFor(t));
+  try {
+    const pet = await app.firstWindow();
+    await pet.waitForLoadState('load');
+    await pet.clock.install(); await pet.reload();
+    await pet.waitForFunction(() => document.querySelector('#pet').dataset.character);
+    await pet.emulateMedia({ reducedMotion: 'no-preference' });
+    await pet.clock.pauseAt(new Date());
+    const motion = () => pet.locator('#pet').getAttribute('data-motion');
+    await movePet(pet, 64, 64); await pet.mouse.down();
+    await movePet(pet, 65, 65); await pet.clock.runFor(200);
+    assert.equal(await motion(), '', 'pressing and hand tremor do not lift the pet');
+    await pet.mouse.up();
+    await pet.evaluate(() => window.petPanel.close());
+    await movePet(pet, 64, 64); await pet.mouse.down(); await movePet(pet, 40, 40);
+    assert.equal(await motion(), 'dragging');
+    assert.equal(await pet.locator('#pet').getAttribute('aria-expanded'), 'false');
+    const held = await pet.locator('#pet').evaluate(canvas => canvas.toDataURL());
+    await pet.clock.runFor(400);
+    assert.notEqual(await pet.locator('#pet').evaluate(canvas => canvas.toDataURL()), held, 'paws animate while held');
+    await pet.mouse.up();
+    assert.equal(await motion(), 'landing');
+    await pet.clock.runFor(400);
+    assert.equal(await motion(), '');
+    assert.equal(await pet.locator('#pet').getAttribute('data-idle'), 'idle');
+
+    await pet.emulateMedia({ reducedMotion: 'reduce' });
+    await movePet(pet, 64, 64); await pet.mouse.down(); await movePet(pet, 40, 40);
+    assert.equal(await motion(), 'dragging');
+    const still = await pet.locator('#pet').evaluate(canvas => canvas.toDataURL());
+    await pet.clock.runFor(2000);
+    assert.equal(await pet.locator('#pet').evaluate(canvas => canvas.toDataURL()), still);
+    await pet.mouse.up();
+    assert.equal(await motion(), '', 'reduced motion skips the landing bounce');
+
+    await pet.emulateMedia({ reducedMotion: 'no-preference' });
+    await pet.evaluate(() => document.querySelector('#pet').addEventListener('gotpointercapture', event => { window.dragPointer = event.pointerId; }));
+    await movePet(pet, 64, 64); await pet.mouse.down(); await movePet(pet, 40, 40);
+    await pet.evaluate(() => document.querySelector('#pet').releasePointerCapture(window.dragPointer));
+    await movePet(pet, 41, 41);
+    assert.equal(await motion(), '', 'lost capture cancels the held pose');
+    await pet.mouse.up();
+    await pet.mouse.move(220, 115); await pet.mouse.down(); await pet.mouse.move(200, 105);
+    assert.equal(await motion(), '', 'dragging the ground does not lift the pet');
+    await pet.mouse.up();
+
+    await movePet(pet, 64, 64); await pet.mouse.down(); await movePet(pet, 40, 40);
+    await app.evaluate(({ Menu }) => Menu.getApplicationMenu().getMenuItemById('toggle-pet-visibility').click());
+    await pet.waitForFunction(() => document.querySelector('#pet').dataset.visible === 'false');
+    assert.equal(await motion(), '', 'hiding clears a held pose');
+    await pet.mouse.up();
+    await app.evaluate(({ Menu }) => Menu.getApplicationMenu().getMenuItemById('toggle-pet-visibility').click());
+    await pet.waitForFunction(() => document.querySelector('#pet').dataset.visible === 'true');
+    assert.equal(await motion(), '');
   } finally { await app.close(); }
 });
 

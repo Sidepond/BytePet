@@ -9,10 +9,31 @@ const [command, stage, character = 'marmalade'] = process.argv.slice(2);
 if (!Object.hasOwn(profiles, character)) throw new Error('Unknown character profile.');
 const profile = profiles[character];
 const directory = path.join(root, 'art', `${character}-pixellab`);
-const stages = ['design', 'sleep-pose', 'sleep-pose-wide', 'idle', 'sleeping'];
+const stages = ['design', 'sleep-pose', 'sleep-pose-wide', 'idle', 'sleeping', 'eating', 'drag-pose', 'dragging'];
 const image = async name => ({ type: 'base64', format: 'png', base64: (await readFile(path.join(directory, 'source', name, '00.png'))).toString('base64') });
 
 async function requestFor(stage) {
+  if (stage === 'drag-pose') return { endpoint: '/edit-image-pixen', body: {
+    image: { type: 'base64', format: 'png', base64: (await readFile(path.join(directory, 'references/idle.png'))).toString('base64') },
+    width: 48, height: 48, seed: profile.seed + 20, no_background: true,
+    description: `Lift this same ${profile.species} gently into the air: upright compact body, front paws tucked at chest, two small hind paws dangling below belly. Curious wide eyes, relaxed ears, tail beside body. Keep exact face, accessories, fur markings, head size and body scale. About 32 pixels tall, feet at y=40. Same three-quarter pixel style. Transparent background. No hand, rope, wings, shadow, symbols, new objects or stretched body.`,
+  } };
+  if (stage === 'dragging') {
+    const first = { type: 'base64', format: 'png', base64: (await readFile(path.join(directory, 'references/dragging.png'))).toString('base64') };
+    return { endpoint: '/animate-with-text-v3', body: {
+      first_frame: first, last_frame: first, frame_count: 8, seed: profile.seed + 21,
+      no_background: true, enhance_prompt: false, drift_threshold: 0,
+      action: `This same ${profile.species} is gently held in the air in this pose. ${profile.species === 'kitten' ? 'Front paws stay gathered near the chest; tiny dangling hind paws wiggle alternately with a small tail-tip curl.' : 'Front paws stay softly folded near the chest; dangling hind paws wiggle a little and the tail gently wags.'} Small natural ear twitches and a curious blink. A calm cute suspended loop. The head and torso stay steady in exactly the same position and scale; only paws, tail, eyelids and ears move subtly. No whole-body swinging, bouncing, sliding, walking, spinning, growing, stretching, hands, rope, symbols or new objects. Preserve all face details, accessories and pixel style. Full body within the transparent canvas. Return seamlessly to the starting pose.`,
+    } };
+  }
+  if (stage === 'eating') {
+    const first = { type: 'base64', format: 'png', base64: (await readFile(path.join(directory, 'references/idle.png'))).toString('base64') };
+    return { endpoint: '/animate-with-text-v3', body: {
+      first_frame: first, last_frame: first, frame_count: 8, seed: profile.seed + 10,
+      no_background: true, enhance_prompt: false, drift_threshold: 0,
+      action: `This same ${profile.species} happily eats a tiny snack while staying in place. Starting from this exact pose, lower the muzzle toward the front paws to take a bite, then lift the head slightly and visibly chew with small mouth opening and closing, rounded cheek movement, contented blinking and a little ear bounce. A front paw briefly brings the small bite toward the mouth, then returns to its original ground contact. Finish swallowing, lick the lips and settle back into the exact starting pose. Clearly readable eating motion, not just idle breathing. Preserve the face, fur markings, accessories, silhouette, pixel size and body scale of the reference. Keep the hind paws and rump anchored at the same floor. No walking, horizontal sliding, camera motion, turning, stretching, bowl, text, symbols, particles or extra limbs. Transparent background, same crisp pixel art. Seamless loop.`,
+    } };
+  }
   if (character !== 'marmalade') {
     if (stage === 'design') return { endpoint: '/create-image-pixen', body: {
       description: `${profile.description} ${sharedStyle}`, image_size: { width: 32, height: 32 },
@@ -82,9 +103,14 @@ async function run() {
   let current, job;
   if (command === 'generate' || command === 'retry-rejected') {
     const request = await requestFor(stage);
+    if (request.endpoint === '/edit-image-pixen' && request.body.description.length > 500) throw new Error('PixelLab edit description exceeds 500 characters.');
     if (command === 'retry-rejected') {
       const rejected = JSON.parse(await readFile(jobFile, 'utf8'));
-      if (rejected.status !== 'rejected' || rejected.httpStatus !== 429 || rejected.id) throw new Error('Only an explicit HTTP 429 rejection without a job ID can be resubmitted.');
+      if (!['rejected', 'unconfirmed'].includes(rejected.status) || ![402, 422, 429].includes(rejected.httpStatus) || rejected.id) throw new Error('Only an explicit HTTP 402/422/429 rejection without a job ID can be resubmitted; resolve credits or validation errors before retrying.');
+      if (rejected.httpStatus === 402) {
+        const balance = await api('/balance');
+        if (!(balance.credits?.usd > 0 || balance.subscription?.generations > 0)) throw new Error('PixelLab credits are still empty. Add credits before resuming.');
+      }
       await writeFile(path.join(directory, `${stage}-rejected-${Date.now()}.json`), JSON.stringify(rejected, null, 2) + '\n', { flag: 'wx' });
     }
     // Reserve the stage BEFORE POST: even a timeout cannot cause a blind paid retry.
@@ -92,7 +118,7 @@ async function run() {
     await writeFile(path.join(directory, `${stage}-request.json`), JSON.stringify(request.body, null, 2) + '\n');
     try { current = await api(request.endpoint, request.body); }
     catch (error) {
-      await writeFile(jobFile, JSON.stringify({ status: error.httpStatus === 429 ? 'rejected' : 'unconfirmed', endpoint: request.endpoint, httpStatus: error.httpStatus }, null, 2) + '\n');
+      await writeFile(jobFile, JSON.stringify({ status: [402, 422, 429].includes(error.httpStatus) ? 'rejected' : 'unconfirmed', endpoint: request.endpoint, httpStatus: error.httpStatus }, null, 2) + '\n');
       throw error;
     }
     await writeFile(responseFile, JSON.stringify(current, null, 2) + '\n');
